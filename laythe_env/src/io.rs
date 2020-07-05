@@ -1,10 +1,11 @@
 use crate::{
   env::{MockEnvio, EnvWrapper},
   fs::{MockFsio, FsWrapper},
-  stdio::StdioWrapper,
+  stdio::{MockStdio, StdioWrapper},
 };
 use std::fmt;
 
+#[derive(Debug)]
 pub struct IoWrapper {
   io: Box<dyn Io>,
 }
@@ -27,7 +28,15 @@ impl IoWrapper {
   }
 }
 
+impl Clone for IoWrapper {
+  fn clone(&self) -> Self {
+    IoWrapper::new(self.io.clone())
+  }
+}
+
 pub trait Io: fmt::Debug {
+  fn clone(&self) -> Box<dyn Io>;
+
   fn stdio(&self) -> StdioWrapper;
   fn fsio(&self) -> FsWrapper;
   fn envio(&self) -> EnvWrapper;
@@ -38,13 +47,16 @@ pub struct MockIo();
 
 impl Io for MockIo {
   fn stdio(&self) -> StdioWrapper {
-    todo!()
+    StdioWrapper::new(Box::new(MockStdio::default()))
   }
   fn fsio(&self) -> FsWrapper {
     FsWrapper::new(Box::new(MockFsio()))
   }
   fn envio(&self) -> EnvWrapper {
     EnvWrapper::new(Box::new(MockEnvio()))
+  }
+  fn clone(&self) -> Box<dyn Io> {
+    Box::new(MockIo())
   }
 }
 

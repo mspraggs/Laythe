@@ -1,14 +1,17 @@
 
-#[derive(Clone)]
-pub struct NativeFsIo();
+use laythe_env::{SlIoError, fs::{SlDirEntry, Fsio}, Error};
+use std::{path::{PathBuf, Path}, fs::{canonicalize, read_to_string}, io};
 
-impl Default for NativeFsIo {
+#[derive(Clone)]
+pub struct NativeFsio();
+
+impl Default for NativeFsio {
   fn default() -> Self {
     Self()
   }
 }
 
-impl FsIo for NativeFsIo {
+impl Fsio for NativeFsio {
   fn read_file(&self, path: &Path) -> Result<String, SlIoError> {
     match read_to_string(path) {
       Ok(file_contents) => Ok(file_contents),

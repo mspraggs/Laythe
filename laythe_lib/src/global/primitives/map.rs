@@ -15,7 +15,7 @@ use laythe_core::{
 };
 use laythe_env::{
   managed::{Managed, Trace},
-  stdio::Stdio,
+  stdio::{StdioWrapper},
 };
 use std::fmt;
 use std::mem;
@@ -186,7 +186,7 @@ impl Trace for MapStr {
     self.method_name.trace()
   }
 
-  fn trace_debug(&self, stdio: &dyn Stdio) -> bool {
+  fn trace_debug(&self, stdio: &mut StdioWrapper) -> bool {
     self.method_name.trace_debug(stdio)
   }
 }
@@ -349,7 +349,7 @@ impl Trace for MapIterator {
     self.map.trace()
   }
 
-  fn trace_debug(&self, stdio: &dyn Stdio) -> bool {
+  fn trace_debug(&self, stdio: &mut StdioWrapper) -> bool {
     self.map.trace_debug(stdio)
   }
 }

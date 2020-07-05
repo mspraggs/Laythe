@@ -2,8 +2,7 @@ use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
 use laythe_core::hooks::{GcHooks, NoContext};
 use laythe_core::module::Module;
 use laythe_env::{
-  io::{Io, NativeIo},
-  memory::Gc,
+  memory::Gc, stdio::StdioWrapper,
 };
 use laythe_vm::compiler::{Compiler, Parser};
 use std::fs::File;
@@ -36,9 +35,8 @@ fn compile_source(source: &str) {
   let hooks = GcHooks::new(&mut context);
   let module =
     hooks.manage(Module::from_path(&hooks, hooks.manage(PathBuf::from("./Benchmark.ly"))).unwrap());
-  let io = NativeIo::default();
-  let mut parser = Parser::new(io.stdio(), source);
-  let compiler = Compiler::new(module, io, &mut parser, &hooks);
+  let mut parser = Parser::new(StdioWrapper::default(), source);
+  let compiler = Compiler::new(module, &mut parser, &hooks);
   compiler.compile().unwrap();
 }
 

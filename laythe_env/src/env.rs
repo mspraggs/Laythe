@@ -9,11 +9,11 @@ impl EnvWrapper {
     Self { env }
   }
 
-  fn current_dir(&self) -> io::Result<PathBuf> {
+  pub fn current_dir(&self) -> io::Result<PathBuf> {
     self.env.current_dir()
   }
 
-  fn args(&self) -> Vec<String> {
+  pub fn args(&self) -> Vec<String> {
     self.env.args()
   }
 }

@@ -5,7 +5,7 @@ use crate::{
 };
 use laythe_env::{
   managed::{Manage, Managed, Trace},
-  stdio::Stdio,
+  stdio::{StdioWrapper},
 };
 use std::fmt;
 use std::mem;
@@ -71,7 +71,7 @@ impl Trace for LyIterator {
     true
   }
 
-  fn trace_debug(&self, stdio: &dyn Stdio) -> bool {
+  fn trace_debug(&self, stdio: &mut StdioWrapper) -> bool {
     self.current.trace_debug(stdio);
     self.iterator.trace_debug(stdio);
 

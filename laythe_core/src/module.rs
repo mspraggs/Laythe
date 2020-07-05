@@ -6,7 +6,7 @@ use crate::{
 };
 use laythe_env::{
   managed::{Manage, Managed, Trace},
-  stdio::Stdio,
+  stdio::StdioWrapper,
 };
 use std::fmt;
 use std::{mem, path::PathBuf};
@@ -182,7 +182,7 @@ impl Trace for Module {
 
     true
   }
-  fn trace_debug(&self, stdio: &dyn Stdio) -> bool {
+  fn trace_debug(&self, stdio: &mut StdioWrapper) -> bool {
     self.module_class.trace();
     self.path.trace_debug(stdio);
 

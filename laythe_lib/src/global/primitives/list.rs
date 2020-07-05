@@ -15,7 +15,7 @@ use laythe_core::{
 };
 use laythe_env::{
   managed::{Managed, Trace},
-  stdio::Stdio,
+  stdio::StdioWrapper,
 };
 use std::{mem, slice::Iter};
 
@@ -449,7 +449,7 @@ impl Trace for ListIterator {
     self.list.trace()
   }
 
-  fn trace_debug(&self, stdio: &dyn Stdio) -> bool {
+  fn trace_debug(&self, stdio: &mut StdioWrapper) -> bool {
     self.list.trace_debug(stdio)
   }
 }

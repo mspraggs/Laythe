@@ -819,7 +819,7 @@ mod unboxed {
       }
     }
 
-    fn trace_debug(&self, stdio: &dyn StdIo) -> bool {
+    fn trace_debug(&self, stdio: &mut StdioWrapper) -> bool {
       match self {
         Value::Nil => true,
         Value::Bool(_) => true,
@@ -888,7 +888,7 @@ mod boxed {
   };
   use laythe_env::{
     managed::{Allocation, Manage, Managed, Trace},
-    stdio::Stdio,
+    stdio::{StdioWrapper},
   };
 
   use std::fmt;
@@ -1196,7 +1196,7 @@ mod boxed {
         _ => true,
       }
     }
-    fn trace_debug(&self, stdio: &dyn Stdio) -> bool {
+    fn trace_debug(&self, stdio: &mut StdioWrapper) -> bool {
       match self.kind() {
         ValueKind::String => self.to_str().trace_debug(stdio),
         ValueKind::List => self.to_list().trace_debug(stdio),

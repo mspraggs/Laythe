@@ -12,7 +12,7 @@ use laythe_core::{
 };
 use laythe_env::{
   managed::{Managed, Trace},
-  stdio::Stdio,
+  stdio::StdioWrapper,
 };
 
 pub const METHOD_CLASS_NAME: &'static str = "Method";

@@ -1,30 +1,39 @@
 
-#[derive(Debug, Clone)]
-pub struct NativeStdIo();
+use laythe_env::stdio::Stdio;
+use std::io::{stdout, stdin, stderr, self};
+use io::{Stdin, Stdout, Stderr};
 
-impl Default for NativeStdIo {
+#[derive(Debug)]
+pub struct NativeStdio {
+  stdout: Stdout,
+  stderr: Stderr,
+  stdin: Stdin,
+}
+
+impl Default for NativeStdio {
   fn default() -> Self {
-    Self()
+    Self {
+      stdout: stdout(),
+      stderr: stderr(),
+      stdin: stdin(),
+    }
   }
 }
 
-impl StdIo for NativeStdIo {
-  fn print(&self, message: &str) {
-    print!("{}", message);
+impl Stdio for NativeStdio {
+  fn stdout(&mut self) -> &mut dyn std::io::Write {
+    &mut self.stdout
   }
-  fn println(&self, message: &str) {
-    println!("{}", message);
+
+  fn stderr(&mut self) -> &mut dyn std::io::Write {
+    &mut self.stderr
   }
-  fn eprint(&self, message: &str) {
-    eprint!("{}", message);
+
+  fn stdin(&self) -> &dyn std::io::Read {
+    &self.stdin
   }
-  fn eprintln(&self, message: &str) {
-    eprintln!("{}", message);
-  }
-  fn flush(&self) -> Result<()> {
-    stdout().flush()
-  }
-  fn read_line(&self, buffer: &mut String) -> Result<usize> {
+
+  fn read_line(&self, buffer: &mut String) -> io::Result<usize> {
     stdin().read_line(buffer)
   }
 }

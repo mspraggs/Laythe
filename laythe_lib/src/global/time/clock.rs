@@ -7,7 +7,7 @@ use laythe_core::{
   value::Value,
   CallResult, LyResult,
 };
-use laythe_env::{managed::Trace, stdio::Stdio};
+use laythe_env::{managed::Trace, stdio::StdioWrapper};
 use std::time::SystemTime;
 
 const CLOCK_META: NativeMeta = NativeMeta::new("clock", Arity::Fixed(0), &[]);

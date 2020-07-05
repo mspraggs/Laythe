@@ -12,9 +12,8 @@ use laythe_core::{
   value::Value,
 };
 use laythe_env::{
-  io::Io,
   managed::{Manage, Managed, Trace},
-  stdio::Stdio,
+  stdio::{StdioWrapper},
 };
 use std::convert::TryInto;
 use std::mem;
@@ -45,7 +44,7 @@ pub enum ForLoop {
 }
 
 /// The laythe compiler for converting tokens to bytecode
-pub struct Compiler<'a, 's, I: Io + 'static> {
+pub struct Compiler<'a, 's> {
   /// The current function
   fun: Managed<Fun>,
 
@@ -57,20 +56,17 @@ pub struct Compiler<'a, 's, I: Io + 'static> {
 
   /// The parent compiler if it exists note uses
   /// unsafe pointer
-  enclosing: Option<*mut Compiler<'a, 's, I>>,
+  enclosing: Option<*mut Compiler<'a, 's>>,
 
   /// The parser in charge incrementing the scanner and
   /// expecting / consuming tokens
-  parser: &'a mut Parser<'s, I::StdIo>,
+  parser: &'a mut Parser<'s>,
 
   /// The current class class compiler
   current_class: Option<Managed<ClassCompiler>>,
 
   /// hooks into the surround context. Used to allocate laythe objects
   hooks: &'a GcHooks<'a>,
-
-  /// The environments standard io access
-  io: I,
 
   /// Number of locals
   local_count: usize,
@@ -88,7 +84,7 @@ pub struct Compiler<'a, 's, I: Io + 'static> {
   constants: LyHashMap<Value, usize>,
 }
 
-impl<'a, 's, I: Io + Clone> Compiler<'a, 's, I> {
+impl<'a, 's> Compiler<'a, 's> {
   /// Create a new instance of the laythe compiler.
   /// The compiler write a sequence of op codes to the chunk
   /// to be executed
@@ -120,8 +116,7 @@ impl<'a, 's, I: Io + Clone> Compiler<'a, 's, I> {
   /// ```
   pub fn new(
     module: Managed<Module>,
-    io: I,
-    parser: &'a mut Parser<'s, I::StdIo>,
+    parser: &'a mut Parser<'s>,
     hooks: &'a GcHooks<'a>,
   ) -> Self {
     let fun = hooks.manage(Fun::new(hooks.manage_str(String::from(SCRIPT)), module));
@@ -132,7 +127,6 @@ impl<'a, 's, I: Io + Clone> Compiler<'a, 's, I> {
       module,
       current_class: None,
       hooks,
-      io,
       parser,
       enclosing: None,
       local_count: 1,
@@ -154,14 +148,13 @@ impl<'a, 's, I: Io + Clone> Compiler<'a, 's, I> {
   }
 
   /// Construct an inner compiler used to compile functions inside of a script
-  fn child(name: Managed<String>, fun_kind: FunKind, enclosing: *mut Compiler<'a, 's, I>) -> Self {
+  fn child(name: Managed<String>, fun_kind: FunKind, enclosing: *mut Compiler<'a, 's>) -> Self {
     let mut child = Self {
       fun: unsafe { (*enclosing).fun },
       fun_kind: fun_kind.clone(),
       module: unsafe { (*enclosing).module },
       current_class: unsafe { (*enclosing).current_class },
       hooks: unsafe { (*enclosing).hooks },
-      io: unsafe { (*enclosing).io.clone() },
       parser: unsafe { (*enclosing).parser },
       enclosing: Some(enclosing),
       local_count: 1,
@@ -202,7 +195,7 @@ impl<'a, 's, I: Io + Clone> Compiler<'a, 's, I> {
   /// // an expression
   /// let source = "3 / 2 + 10;".to_string();
   ///
-  /// let gc = Gc::new(Box::new(NativeStdIo()));
+  /// let gc = Gc::default();
   /// let mut context = NoContext::new(&gc);
   /// let mut hooks = GcHooks::new(&mut context);
   /// let mut parser = Parser::new(NativeStdIo(), &source);
@@ -1768,7 +1761,7 @@ impl Trace for ClassCompiler {
     true
   }
 
-  fn trace_debug(&self, stdio: &dyn Stdio) -> bool {
+  fn trace_debug(&self, stdio: &mut StdioWrapper) -> bool {
     self.enclosing.map(|enclosing| {
       enclosing.trace_debug(stdio);
     });
@@ -1799,7 +1792,7 @@ impl Manage for ClassCompiler {
 
 /// The space lox parser. This struct is responsible for
 /// advancing the scanner and checking for specific conditions
-pub struct Parser<'a, S: Stdio> {
+pub struct Parser<'a> {
   /// The current token
   current: Token,
 
@@ -1816,12 +1809,12 @@ pub struct Parser<'a, S: Stdio> {
   scanner: Scanner<'a>,
 
   /// The environments standard io access
-  stdio: S,
+  stdio: StdioWrapper,
 }
 
-impl<'a, S: Stdio> Parser<'a, S> {
+impl<'a> Parser<'a> {
   /// Create a new instance of the parser from a source str
-  pub fn new(stdio: S, source: &'a str) -> Self {
+  pub fn new(stdio: StdioWrapper, source: &'a str) -> Self {
     Self {
       scanner: Scanner::new(source),
       stdio,
@@ -1897,15 +1890,17 @@ impl<'a, S: Stdio> Parser<'a, S> {
     }
 
     self.panic_mode = true;
-    self.stdio.eprint(&format!("[line {}] Error", token.line));
+    let stderr = self.stdio.stderr();
+
+    write!(stderr, "[line {}] Error", token.line).expect("Unable to write to stderr.");
 
     match token.kind {
-      TokenKind::Eof => self.stdio.eprint(" at end"),
+      TokenKind::Eof => { write!(stderr, " at end").expect("Unable to write to stderr."); },
       TokenKind::Error => (),
-      _ => self.stdio.eprint(&format!(" at {}", token.lexeme)),
+      _ => { write!(stderr, " at {}", token.lexeme).expect("Unable to write to stderr."); }
     }
 
-    self.stdio.eprintln(&format!(": {}", message));
+    writeln!(stderr, ": {}", message).expect("Unable to write to stderr.");
     self.had_error = true;
   }
 }
@@ -1986,7 +1981,8 @@ mod test {
   use crate::debug::disassemble_chunk;
   use laythe_core::chunk::decode_u16;
   use laythe_core::hooks::NoContext;
-  use laythe_env::{io::NativeIo, memory::Gc, stdio::NativeStdIo};
+  use laythe_env::{memory::Gc};
+  use laythe_native::stdio::NativeStdio;
   use std::path::PathBuf;
 
   enum ByteCodeTest {
@@ -1995,15 +1991,15 @@ mod test {
   }
 
   fn test_compile<'a>(src: String, gc: &mut Gc) -> Managed<Fun> {
-    let io = NativeIo();
-    let mut parser = Parser::new(io.stdio(), &src);
+    let stdio = StdioWrapper::new(Box::new(NativeStdio::default()));
+    let mut parser = Parser::new(stdio, &src);
 
     let mut context = NoContext::new(gc);
     let hooks = &GcHooks::new(&mut context);
 
     let module = hooks
       .manage(Module::from_path(&hooks, hooks.manage(PathBuf::from("path/module.ly"))).unwrap());
-    let compiler = Compiler::new(module, io, &mut parser, &hooks);
+    let compiler = Compiler::new(module, &mut parser, &hooks);
     let result = compiler.compile();
     assert_eq!(result.is_ok(), true);
 
@@ -2055,7 +2051,9 @@ mod test {
   }
 
   fn assert_simple_bytecode(fun: Managed<Fun>, code: &[AlignedByteCode]) {
-    disassemble_chunk(&NativeStdIo(), &fun.chunk(), "test");
+    let mut stdio = StdioWrapper::default();
+
+    disassemble_chunk(&mut stdio, &fun.chunk(), "test");
     let decoded_byte_code = decode_byte_code(fun);
     assert_eq!(decoded_byte_code.len(), code.len());
 
@@ -2066,7 +2064,9 @@ mod test {
   }
 
   fn assert_fun_bytecode(fun: Managed<Fun>, code: &[ByteCodeTest]) {
-    disassemble_chunk(&NativeStdIo(), &fun.chunk(), &*fun.name);
+    let mut stdio = StdioWrapper::default();
+
+    disassemble_chunk(&mut stdio, &fun.chunk(), &*fun.name);
     let decoded_byte_code = decode_byte_code(fun);
     assert_eq!(decoded_byte_code.len(), code.len(), "for fun {}", fun.name);
 
@@ -2097,7 +2097,7 @@ mod test {
   fn op_print() {
     let example = "print 10;".to_string();
 
-    let mut gc = Gc::new(Box::new(NativeStdIo()));
+    let mut gc = Gc::default();
     let fun = test_compile(example, &mut gc);
     assert_simple_bytecode(
       fun,
@@ -2117,7 +2117,7 @@ mod test {
     "#
     .to_string();
 
-    let mut gc = Gc::new(Box::new(NativeStdIo()));
+    let mut gc = Gc::default();
     let fun = test_compile(example, &mut gc);
 
     assert_simple_bytecode(
@@ -2138,7 +2138,7 @@ mod test {
     "
     .to_string();
 
-    let mut gc = Gc::new(Box::new(NativeStdIo()));
+    let mut gc = Gc::default();
     let fun = test_compile(example, &mut gc);
 
     assert_simple_bytecode(
@@ -2160,7 +2160,7 @@ mod test {
     "
     .to_string();
 
-    let mut gc = Gc::new(Box::new(NativeStdIo()));
+    let mut gc = Gc::default();
     let fun = test_compile(example, &mut gc);
 
     assert_fun_bytecode(
@@ -2188,7 +2188,7 @@ mod test {
     "
     .to_string();
 
-    let mut gc = Gc::new(Box::new(NativeStdIo()));
+    let mut gc = Gc::default();
     let fun = test_compile(example, &mut gc);
 
     assert_simple_bytecode(
@@ -2319,7 +2319,7 @@ mod test {
     "
     .to_string();
 
-    let mut gc = Gc::new(Box::new(NativeStdIo()));
+    let mut gc = Gc::default();
     let fun = test_compile(example, &mut gc);
 
     assert_simple_bytecode(
@@ -2354,7 +2354,7 @@ mod test {
     "
     .to_string();
 
-    let mut gc = Gc::new(Box::new(NativeStdIo()));
+    let mut gc = Gc::default();
     let fun = test_compile(example, &mut gc);
 
     assert_fun_bytecode(
@@ -2419,7 +2419,7 @@ mod test {
     "
     .to_string();
 
-    let mut gc = Gc::new(Box::new(NativeStdIo()));
+    let mut gc = Gc::default();
     let fun = test_compile(example, &mut gc);
 
     assert_fun_bytecode(
@@ -2463,7 +2463,7 @@ mod test {
     "
     .to_string();
 
-    let mut gc = Gc::new(Box::new(NativeStdIo()));
+    let mut gc = Gc::default();
     let fun = test_compile(example, &mut gc);
 
     assert_simple_bytecode(
@@ -2494,7 +2494,7 @@ mod test {
     "
     .to_string();
 
-    let mut gc = Gc::new(Box::new(NativeStdIo()));
+    let mut gc = Gc::default();
     let fun = test_compile(example, &mut gc);
 
     assert_simple_bytecode(
@@ -2523,7 +2523,7 @@ mod test {
     "
     .to_string();
 
-    let mut gc = Gc::new(Box::new(NativeStdIo()));
+    let mut gc = Gc::default();
     let fun = test_compile(example, &mut gc);
 
     assert_simple_bytecode(
@@ -2550,7 +2550,7 @@ mod test {
     "
     .to_string();
 
-    let mut gc = Gc::new(Box::new(NativeStdIo()));
+    let mut gc = Gc::default();
     let fun = test_compile(example, &mut gc);
 
     assert_simple_bytecode(
@@ -2574,7 +2574,7 @@ mod test {
     "
     .to_string();
 
-    let mut gc = Gc::new(Box::new(NativeStdIo()));
+    let mut gc = Gc::default();
     let fun = test_compile(example, &mut gc);
 
     assert_simple_bytecode(
@@ -2600,7 +2600,7 @@ mod test {
     "
     .to_string();
 
-    let mut gc = Gc::new(Box::new(NativeStdIo()));
+    let mut gc = Gc::default();
     let fun = test_compile(example, &mut gc);
 
     assert_simple_bytecode(
@@ -2622,7 +2622,7 @@ mod test {
     "
     .to_string();
 
-    let mut gc = Gc::new(Box::new(NativeStdIo()));
+    let mut gc = Gc::default();
     let fun = test_compile(example, &mut gc);
     assert_fun_bytecode(
       fun,
@@ -2655,7 +2655,7 @@ mod test {
     "
     .to_string();
 
-    let mut gc = Gc::new(Box::new(NativeStdIo()));
+    let mut gc = Gc::default();
     let fun = test_compile(example, &mut gc);
     assert_fun_bytecode(
       fun,
@@ -2699,7 +2699,7 @@ mod test {
     "
     .to_string();
 
-    let mut gc = Gc::new(Box::new(NativeStdIo()));
+    let mut gc = Gc::default();
     let fun = test_compile(example, &mut gc);
     assert_fun_bytecode(
       fun,
@@ -2764,7 +2764,7 @@ mod test {
     "
     .to_string();
 
-    let mut gc = Gc::new(Box::new(NativeStdIo()));
+    let mut gc = Gc::default();
     let fun = test_compile(example, &mut gc);
     assert_fun_bytecode(
       fun,
@@ -2806,7 +2806,7 @@ mod test {
   fn empty_fun() {
     let example = "fn example() {} example();".to_string();
 
-    let mut gc = Gc::new(Box::new(NativeStdIo()));
+    let mut gc = Gc::default();
     let fun = test_compile(example, &mut gc);
     assert_fun_bytecode(
       fun,
@@ -2839,7 +2839,7 @@ mod test {
     "
     .to_string();
 
-    let mut gc = Gc::new(Box::new(NativeStdIo()));
+    let mut gc = Gc::default();
     let fun = test_compile(example, &mut gc);
     assert_fun_bytecode(
       fun,
@@ -2870,7 +2870,7 @@ mod test {
   fn empty_fun_basic() {
     let example = "fn example() { let a = 10; return a; } example();".to_string();
 
-    let mut gc = Gc::new(Box::new(NativeStdIo()));
+    let mut gc = Gc::default();
     let fun = test_compile(example, &mut gc);
     assert_fun_bytecode(
       fun,
@@ -2899,7 +2899,7 @@ mod test {
   fn map() {
     let example = "let a = { \"cat\": \"bat\", 10: nil };".to_string();
 
-    let mut gc = Gc::new(Box::new(NativeStdIo()));
+    let mut gc = Gc::default();
     let fun = test_compile(example, &mut gc);
 
     assert_simple_bytecode(
@@ -2922,7 +2922,7 @@ mod test {
   fn list() {
     let example = "let a = [1, 2, 3, \"cat\"];".to_string();
 
-    let mut gc = Gc::new(Box::new(NativeStdIo()));
+    let mut gc = Gc::default();
     let fun = test_compile(example, &mut gc);
 
     assert_simple_bytecode(
@@ -2945,7 +2945,7 @@ mod test {
   fn for_loop() {
     let example = "for (let x = 0; x < 10; x = x + 1) { print(x); }".to_string();
 
-    let mut gc = Gc::new(Box::new(NativeStdIo()));
+    let mut gc = Gc::default();
     let fun = test_compile(example, &mut gc);
 
     assert_simple_bytecode(
@@ -2979,7 +2979,7 @@ mod test {
   fn for_range_loop() {
     let example = "for (let x in [1, 2, 3]) { print x; }".to_string();
 
-    let mut gc = Gc::new(Box::new(NativeStdIo()));
+    let mut gc = Gc::default();
     let fun = test_compile(example, &mut gc);
 
     assert_simple_bytecode(
@@ -3015,7 +3015,7 @@ mod test {
   #[test]
   fn while_loop() {
     let example = "while (true) { print 10; }".to_string();
-    let mut gc = Gc::new(Box::new(NativeStdIo()));
+    let mut gc = Gc::default();
     let fun = test_compile(example, &mut gc);
 
     assert_simple_bytecode(
@@ -3037,7 +3037,7 @@ mod test {
   #[test]
   fn or_operator() {
     let example = "print false or true;".to_string();
-    let mut gc = Gc::new(Box::new(NativeStdIo()));
+    let mut gc = Gc::default();
     let fun = test_compile(example, &mut gc);
 
     assert_simple_bytecode(
@@ -3059,7 +3059,7 @@ mod test {
   fn if_condition() {
     let example = "if (3 < 10) { print \"hi\"; }".to_string();
 
-    let mut gc = Gc::new(Box::new(NativeStdIo()));
+    let mut gc = Gc::default();
     let fun = test_compile(example, &mut gc);
 
     assert_simple_bytecode(
@@ -3084,7 +3084,7 @@ mod test {
   fn if_else_condition() {
     let example = "if (3 < 10) { print \"hi\"; } else { print \"bye\"; }".to_string();
 
-    let mut gc = Gc::new(Box::new(NativeStdIo()));
+    let mut gc = Gc::default();
     let fun = test_compile(example, &mut gc);
 
     assert_simple_bytecode(
@@ -3111,7 +3111,7 @@ mod test {
   fn declare_local() {
     let example = "{ let x = 10; }".to_string();
 
-    let mut gc = Gc::new(Box::new(NativeStdIo()));
+    let mut gc = Gc::default();
     let fun = test_compile(example, &mut gc);
     assert_simple_bytecode(
       fun,
@@ -3128,7 +3128,7 @@ mod test {
   fn op_get_local() {
     let example = "{ let x = 10; print(x); }".to_string();
 
-    let mut gc = Gc::new(Box::new(NativeStdIo()));
+    let mut gc = Gc::default();
     let fun = test_compile(example, &mut gc);
     assert_simple_bytecode(
       fun,
@@ -3147,7 +3147,7 @@ mod test {
   fn op_set_local() {
     let example = "{ let x = 10; x = 5; }".to_string();
 
-    let mut gc = Gc::new(Box::new(NativeStdIo()));
+    let mut gc = Gc::default();
     let fun = test_compile(example, &mut gc);
 
     assert_simple_bytecode(
@@ -3168,7 +3168,7 @@ mod test {
   fn op_define_global_nil() {
     let example = "let x;".to_string();
 
-    let mut gc = Gc::new(Box::new(NativeStdIo()));
+    let mut gc = Gc::default();
     let fun = test_compile(example, &mut gc);
 
     assert_simple_bytecode(
@@ -3186,7 +3186,7 @@ mod test {
   fn op_define_global_val() {
     let example = "let x = 10;".to_string();
 
-    let mut gc = Gc::new(Box::new(NativeStdIo()));
+    let mut gc = Gc::default();
     let fun = test_compile(example, &mut gc);
 
     assert_simple_bytecode(
@@ -3204,7 +3204,7 @@ mod test {
   fn op_get_global() {
     let example = "print x;".to_string();
 
-    let mut gc = Gc::new(Box::new(NativeStdIo()));
+    let mut gc = Gc::default();
     let fun = test_compile(example, &mut gc);
     assert_simple_bytecode(
       fun,
@@ -3221,7 +3221,7 @@ mod test {
   fn op_set_global() {
     let example = "x = \"cat\";".to_string();
 
-    let mut gc = Gc::new(Box::new(NativeStdIo()));
+    let mut gc = Gc::default();
     let fun = test_compile(example, &mut gc);
     assert_simple_bytecode(
       fun,
@@ -3239,7 +3239,7 @@ mod test {
   fn op_pop() {
     let example = "false;".to_string();
 
-    let mut gc = Gc::new(Box::new(NativeStdIo()));
+    let mut gc = Gc::default();
     let fun = test_compile(example, &mut gc);
     assert_simple_bytecode(
       fun,
@@ -3256,7 +3256,7 @@ mod test {
   fn op_return() {
     let example = "".to_string();
 
-    let mut gc = Gc::new(Box::new(NativeStdIo()));
+    let mut gc = Gc::default();
     let fun = test_compile(example, &mut gc);
     assert_simple_bytecode(fun, &vec![AlignedByteCode::Nil, AlignedByteCode::Return]);
   }
@@ -3265,7 +3265,7 @@ mod test {
   fn op_number() {
     let example = "5.18;".to_string();
 
-    let mut gc = Gc::new(Box::new(NativeStdIo()));
+    let mut gc = Gc::default();
     let fun = test_compile(example, &mut gc);
     assert_simple_bytecode(
       fun,
@@ -3282,7 +3282,7 @@ mod test {
   fn op_string() {
     let example = "\"example\";".to_string();
 
-    let mut gc = Gc::new(Box::new(NativeStdIo()));
+    let mut gc = Gc::default();
     let fun = test_compile(example, &mut gc);
     assert_simple_bytecode(
       fun,
@@ -3299,7 +3299,7 @@ mod test {
   fn op_false() {
     let example = "false;".to_string();
 
-    let mut gc = Gc::new(Box::new(NativeStdIo()));
+    let mut gc = Gc::default();
     let fun = test_compile(example, &mut gc);
     assert_simple_bytecode(
       fun,
@@ -3316,7 +3316,7 @@ mod test {
   fn op_true() {
     let example = "true;".to_string();
 
-    let mut gc = Gc::new(Box::new(NativeStdIo()));
+    let mut gc = Gc::default();
     let fun = test_compile(example, &mut gc);
     assert_simple_bytecode(
       fun,
@@ -3333,7 +3333,7 @@ mod test {
   fn op_nil() {
     let example = "nil;".to_string();
 
-    let mut gc = Gc::new(Box::new(NativeStdIo()));
+    let mut gc = Gc::default();
     let fun = test_compile(example, &mut gc);
     assert_simple_bytecode(
       fun,
@@ -3350,7 +3350,7 @@ mod test {
   fn op_not() {
     let example = "!false;".to_string();
 
-    let mut gc = Gc::new(Box::new(NativeStdIo()));
+    let mut gc = Gc::default();
     let fun = test_compile(example, &mut gc);
     assert_simple_bytecode(
       fun,
@@ -3368,7 +3368,7 @@ mod test {
   fn op_negate() {
     let example = "-15;".to_string();
 
-    let mut gc = Gc::new(Box::new(NativeStdIo()));
+    let mut gc = Gc::default();
     let fun = test_compile(example, &mut gc);
     assert_simple_bytecode(
       fun,
@@ -3386,7 +3386,7 @@ mod test {
   fn op_add() {
     let example = "10 + 4;".to_string();
 
-    let mut gc = Gc::new(Box::new(NativeStdIo()));
+    let mut gc = Gc::default();
     let fun = test_compile(example, &mut gc);
     assert_simple_bytecode(
       fun,
@@ -3405,7 +3405,7 @@ mod test {
   fn op_subtract() {
     let example = "10 - 4;".to_string();
 
-    let mut gc = Gc::new(Box::new(NativeStdIo()));
+    let mut gc = Gc::default();
     let fun = test_compile(example, &mut gc);
     assert_simple_bytecode(
       fun,
@@ -3424,7 +3424,7 @@ mod test {
   fn op_divide() {
     let example = "10 / 4;".to_string();
 
-    let mut gc = Gc::new(Box::new(NativeStdIo()));
+    let mut gc = Gc::default();
     let fun = test_compile(example, &mut gc);
     assert_simple_bytecode(
       fun,
@@ -3443,7 +3443,7 @@ mod test {
   fn op_multi() {
     let example = "10 * 4;".to_string();
 
-    let mut gc = Gc::new(Box::new(NativeStdIo()));
+    let mut gc = Gc::default();
     let fun = test_compile(example, &mut gc);
     assert_simple_bytecode(
       fun,
@@ -3462,7 +3462,7 @@ mod test {
   fn op_equal() {
     let example = "true == nil;".to_string();
 
-    let mut gc = Gc::new(Box::new(NativeStdIo()));
+    let mut gc = Gc::default();
     let fun = test_compile(example, &mut gc);
     assert_simple_bytecode(
       fun,
@@ -3481,7 +3481,7 @@ mod test {
   fn op_not_equal() {
     let example = "true != nil;".to_string();
 
-    let mut gc = Gc::new(Box::new(NativeStdIo()));
+    let mut gc = Gc::default();
     let fun = test_compile(example, &mut gc);
     assert_simple_bytecode(
       fun,
@@ -3501,7 +3501,7 @@ mod test {
   fn op_less() {
     let example = "3 < 5;".to_string();
 
-    let mut gc = Gc::new(Box::new(NativeStdIo()));
+    let mut gc = Gc::default();
     let fun = test_compile(example, &mut gc);
     assert_simple_bytecode(
       fun,
@@ -3520,7 +3520,7 @@ mod test {
   fn op_less_equal() {
     let example = "3 <= 5;".to_string();
 
-    let mut gc = Gc::new(Box::new(NativeStdIo()));
+    let mut gc = Gc::default();
     let fun = test_compile(example, &mut gc);
     assert_simple_bytecode(
       fun,
@@ -3540,7 +3540,7 @@ mod test {
   fn op_greater() {
     let example = "3 > 5;".to_string();
 
-    let mut gc = Gc::new(Box::new(NativeStdIo()));
+    let mut gc = Gc::default();
     let fun = test_compile(example, &mut gc);
     assert_simple_bytecode(
       fun,
@@ -3559,7 +3559,7 @@ mod test {
   fn op_greater_equal() {
     let example = "3 >= 5;".to_string();
 
-    let mut gc = Gc::new(Box::new(NativeStdIo()));
+    let mut gc = Gc::default();
     let fun = test_compile(example, &mut gc);
     assert_simple_bytecode(
       fun,

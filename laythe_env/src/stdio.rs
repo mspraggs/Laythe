@@ -5,20 +5,28 @@ pub struct StdioWrapper {
   stdio: Box<dyn Stdio>,
 }
 
+impl Default for StdioWrapper {
+  fn default() -> Self {
+    Self { 
+      stdio: Box::new(MockStdio::default())
+    }
+  }
+}
+
 impl StdioWrapper {
   pub fn new(stdio: Box<dyn Stdio>) -> Self {
     Self { stdio }
   }
 
-  pub fn stdout(&self) -> &dyn Write {
+  pub fn stdout(&mut self) -> &mut dyn Write {
     self.stdio.stdout()
   }
 
-  pub fn stderr(&self) -> &dyn Write {
+  pub fn stderr(&mut self) -> &mut dyn Write {
     self.stdio.stderr()
   }
 
-  pub fn stdin(&self) -> &dyn Read {
+  pub fn stdin(&mut self) -> &dyn Read {
     self.stdio.stdin()
   }
 
@@ -28,29 +36,61 @@ impl StdioWrapper {
 }
 
 pub trait Stdio {
-  fn stdout(&self) -> &dyn Write;
-  fn stderr(&self) -> &dyn Write;
+  fn stdout(&mut self) -> &mut dyn Write;
+  fn stderr(&mut self) -> &mut dyn Write;
   fn stdin(&self) -> &dyn Read;
 
   fn read_line(&self, buffer: &mut String) -> io::Result<usize>;
 }
 
 
-pub struct MockStdio();
+pub struct MockStdio {
+  write: MockWrite,
+  read: MockRead
+}
 
-impl Stdio for MockStdio {
-  fn stdout(&self) -> &dyn Write {
-      todo!()
-  }
-  fn stderr(&self) -> &dyn Write {
-      todo!()
-  }
-  fn stdin(&self) -> &dyn Read {
-      todo!()
-  }
-  fn read_line(&self, buffer: &mut String) -> io::Result<usize> {
-      todo!()
+impl Default for MockStdio {
+  fn default() -> Self {
+    Self {
+      write: MockWrite(),
+      read: MockRead(),
+    }
   }
 }
 
-pub struct  MockWrite();
+impl Stdio for MockStdio {
+  fn stdout(&mut self) -> &mut dyn Write {
+    &mut self.write
+  }
+  fn stderr(&mut self) -> &mut dyn Write {
+    &mut self.write
+  }
+  fn stdin(&self) -> &dyn Read {
+    &self.read
+  }
+  fn read_line(&self, buffer: &mut String) -> io::Result<usize> {
+    const LINE: &str = "let x = 10;";
+    buffer.push_str(LINE);
+
+    Ok(LINE.len())
+  }
+}
+
+pub struct MockWrite();
+
+impl Write for MockWrite {
+  fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+    Ok(buf.len())
+  }
+  fn flush(&mut self) -> io::Result<()> {
+    Ok(())
+  }
+}
+
+pub struct MockRead();
+
+impl Read for MockRead {
+  fn read(&mut self, _buf: &mut [u8]) -> io::Result<usize> {
+    Ok(0)
+  }
+}

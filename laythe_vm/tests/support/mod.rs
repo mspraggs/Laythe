@@ -1,11 +1,16 @@
-use laythe_env::{env::NativeEnvIo, fs::NativeFsIo, io::Io, stdio::Stdio};
+use laythe_env::{io::{IoWrapper, Io}, fs::FsWrapper, env::EnvWrapper, stdio::{StdioWrapper, Stdio}};
 use laythe_vm::vm::{ExecuteResult, Vm};
+use laythe_native::{
+  fs::NativeFsio,
+  env::NativeEnvio,
+};
 use std::fs::File;
 use std::io::prelude::*;
 use std::{
-  cell::RefCell,
+  cell::{Ref, RefCell, RefMut},
   path::{Path, PathBuf},
 };
+use std::str;
 use std::{io::Result, rc::Rc};
 
 pub fn fixture_path_inner(fixture_path: &str, test_file_path: &str) -> Option<PathBuf> {
@@ -18,10 +23,10 @@ pub fn fixture_path_inner(fixture_path: &str, test_file_path: &str) -> Option<Pa
     .and_then(|path| Some(path.join("fixture").join(fixture_path)))
 }
 
-pub fn assert_files_exit<I: Io + 'static>(
+pub fn assert_files_exit(
   paths: &[&str],
   test_file_path: &str,
-  io: I,
+  io: IoWrapper,
   result: ExecuteResult,
 ) -> Result<()> {
   for path in paths {
@@ -57,15 +62,18 @@ pub fn assert_file_exit_and_stdio(
   path: &str,
   file_path: &str,
   stdout: Option<Vec<&str>>,
-  errout: Option<Vec<&str>>,
+  stderr: Option<Vec<&str>>,
   result: ExecuteResult,
 ) -> Result<()> {
-  let io = MockedConsoleIo::new(MockedStdIo::default());
+  let mut mock_console = MockedConsoleIo::new(MockedStdIo::default());
+  let io = IoWrapper::new(mock_console.clone());
 
   assert_files_exit(&[path], file_path, io.clone(), result)?;
 
+  mock_console.stdio.finish();
   if let Some(stdout) = stdout {
-    io.stdio
+    mock_console
+      .stdio
       .stdout
       .borrow()
       .iter()
@@ -75,15 +83,18 @@ pub fn assert_file_exit_and_stdio(
       });
 
     assert_eq!(
-      io.stdio.stdout.borrow().len(),
+      mock_console
+      .stdio
+      .stdout.borrow().len(),
       stdout.len(),
       "Different standard out lines were collected than expected"
     );
   }
 
-  if let Some(errout) = errout {
-    io.stdio
-      .errout
+  if let Some(errout) = stderr {
+    mock_console
+      .stdio
+      .stderr
       .borrow()
       .iter()
       .zip(errout.iter())
@@ -92,7 +103,9 @@ pub fn assert_file_exit_and_stdio(
       });
 
     assert_eq!(
-      io.stdio.errout.borrow().len(),
+      mock_console
+      .stdio
+      .stderr.borrow().len(),
       errout.len(),
       "Different error out lines were collected than expected"
     );
@@ -100,7 +113,7 @@ pub fn assert_file_exit_and_stdio(
 
   Ok(())
 }
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Default)]
 pub struct MockedConsoleIo {
   pub stdio: MockedStdIo,
 }
@@ -112,71 +125,115 @@ impl MockedConsoleIo {
 }
 
 impl Io for MockedConsoleIo {
-  type StdIo = MockedStdIo;
-  type FsIo = NativeFsIo;
-  type EnvIo = NativeEnvIo;
-
-  fn stdio(&self) -> Self::StdIo {
-    self.stdio.clone()
+  fn stdio(&self) -> StdioWrapper {
+    StdioWrapper::new(Box::new(self.stdio.clone()))
   }
 
-  fn fsio(&self) -> Self::FsIo {
-    NativeFsIo()
+  fn fsio(&self) -> FsWrapper {
+    FsWrapper::new(Box::new(NativeFsio()))
   }
 
-  fn envio(&self) -> Self::EnvIo {
-    NativeEnvIo()
+  fn envio(&self) -> EnvWrapper {
+    EnvWrapper::new(Box::new(NativeEnvio()))
+  }
+
+  fn clone(&self) -> Box<dyn Io> {
+    Box::new(MockedConsoleIo::new(self.stdio.clone()))
+  }
+}
+
+
+#[derive(Clone, Debug)]
+pub struct StdioCapture(Rc<RefCell<Vec<String>>>);
+
+impl Default for StdioCapture {
+  fn default() -> Self {
+    Self(Rc::new(RefCell::new(vec![])))
+  }
+}
+
+impl StdioCapture {
+  fn borrow(&self) -> Ref<Vec<String>> {
+    self.0.borrow()
+  }
+
+  fn borrow_mut(&self) -> RefMut<Vec<String>> {
+    self.0.borrow_mut()
   }
 }
 
 #[derive(Clone, Debug)]
 pub struct MockedStdIo {
-  pub stdout: Rc<RefCell<Vec<String>>>,
-  pub errout: Rc<RefCell<Vec<String>>>,
+  pub stdout: StdioCapture,
+  pub stderr: StdioCapture,
   pub read_lines: Rc<RefCell<Vec<String>>>,
 }
 
 impl Default for MockedStdIo {
   fn default() -> Self {
     Self {
-      stdout: Rc::new(RefCell::new(vec![])),
-      errout: Rc::new(RefCell::new(vec![])),
+      stdout: StdioCapture::default(),
+      stderr: StdioCapture::default(),
       read_lines: Rc::new(RefCell::new(vec![])),
     }
   }
 }
 
+impl MockedStdIo {
+  pub fn finish(&mut self) {
+    if let Some(last) = self.stdout.borrow().last() {
+      if last == "" {
+        self.stdout.borrow_mut().pop();
+      }
+    }
+
+    if let Some(last) = self.stderr.borrow().last() {
+      if last == "" {
+        self.stderr.borrow_mut().pop();
+      }
+    }
+  }
+}
+
 impl Stdio for MockedStdIo {
-  fn print(&self, message: &str) {
-    print!("{}", message);
-
-    match self.stdout.borrow_mut().last_mut() {
-      Some(line) => line.push_str(message),
-      None => self.stdout.borrow_mut().push(message.to_string()),
-    }
+  fn stdout(&mut self) -> &mut dyn Write {
+    &mut self.stdout
   }
-  fn println(&self, message: &str) {
-    println!("{}", message);
-
-    self.stdout.borrow_mut().push(message.to_string());
+  fn stderr(&mut self) -> &mut dyn Write {
+    &mut self.stderr
   }
-  fn eprint(&self, message: &str) {
-    eprint!("{}", message);
-
-    match self.errout.borrow_mut().last_mut() {
-      Some(line) => line.push_str(message),
-      None => self.errout.borrow_mut().push(message.to_string()),
-    }
-  }
-  fn eprintln(&self, message: &str) {
-    eprintln!("{}", message);
-
-    self.errout.borrow_mut().push(message.to_string());
-  }
-  fn flush(&self) -> Result<()> {
-    Ok(())
+  fn stdin(&self) -> &dyn Read {
+    todo!()
   }
   fn read_line(&self, _buffer: &mut String) -> Result<usize> {
     Ok(0)
+  }
+}
+
+impl Write for StdioCapture {
+  fn write(&mut self, buf: &[u8]) -> Result<usize> {
+    let string = String::from(str::from_utf8(buf).unwrap());
+    let mut segments = string.split('\n');
+
+    match segments.next() {
+      Some(first) => {
+        let mut capture = self.borrow_mut();
+        
+        match capture.last_mut() {
+          Some(last) => last.push_str(first),
+          None => capture.push(first.to_string())
+        }
+      },
+      None => panic!()
+    }
+
+    for remaining in segments {
+      self.borrow_mut().push(remaining.to_string())
+    }
+
+    Ok(buf.len())
+  }
+  fn flush(&mut self) -> Result<()> {
+    Ok(())
   }
 }

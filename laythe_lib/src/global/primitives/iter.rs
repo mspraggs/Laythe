@@ -15,7 +15,7 @@ use laythe_core::{
 };
 use laythe_env::{
   managed::{Managed, Trace},
-  stdio::Stdio,
+  stdio::StdioWrapper,
 };
 use std::mem;
 
@@ -233,7 +233,7 @@ impl Trace for MapIterator {
     true
   }
 
-  fn trace_debug(&self, stdio: &dyn Stdio) -> bool {
+  fn trace_debug(&self, stdio: &mut StdioWrapper) -> bool {
     self.current.trace_debug(stdio);
     self.iter.trace_debug(stdio);
     self.callable.trace_debug(stdio);
@@ -315,7 +315,7 @@ impl Trace for FilterIterator {
     true
   }
 
-  fn trace_debug(&self, stdio: &dyn Stdio) -> bool {
+  fn trace_debug(&self, stdio: &mut StdioWrapper) -> bool {
     self.current.trace_debug(stdio);
     self.iter.trace_debug(stdio);
     self.callable.trace_debug(stdio);
@@ -451,7 +451,7 @@ impl Trace for ZipIterator {
     true
   }
 
-  fn trace_debug(&self, stdio: &dyn Stdio) -> bool {
+  fn trace_debug(&self, stdio: &mut StdioWrapper) -> bool {
     self.current.trace_debug(stdio);
     self.iters.iter().for_each(|iter| {
       iter.trace_debug(stdio);

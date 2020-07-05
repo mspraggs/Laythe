@@ -13,7 +13,7 @@ use hash_map::Entry;
 use hashbrown::{hash_map, HashMap};
 use laythe_env::{
   managed::{Manage, Managed, Trace},
-  stdio::Stdio,
+  stdio::{StdioWrapper},
 };
 use slice::SliceIndex;
 use std::{
@@ -35,7 +35,7 @@ impl Trace for BuiltIn {
     self.primitives.trace()
   }
 
-  fn trace_debug(&self, stdio: &dyn Stdio) -> bool {
+  fn trace_debug(&self, stdio: &mut StdioWrapper) -> bool {
     self.primitives.trace_debug(stdio)
   }
 }
@@ -128,7 +128,7 @@ impl Trace for BuiltinPrimitives {
     true
   }
 
-  fn trace_debug(&self, stdio: &dyn Stdio) -> bool {
+  fn trace_debug(&self, stdio: &mut StdioWrapper) -> bool {
     self.bool.trace_debug(stdio);
     self.nil.trace_debug(stdio);
     self.class.trace_debug(stdio);
@@ -218,7 +218,7 @@ impl Trace for Upvalue {
     }
   }
 
-  fn trace_debug(&self, stdio: &dyn Stdio) -> bool {
+  fn trace_debug(&self, stdio: &mut StdioWrapper) -> bool {
     match self {
       Upvalue::Closed(upvalue) => upvalue.trace_debug(stdio),
       _ => true,
@@ -381,7 +381,7 @@ impl Trace for Fun {
     true
   }
 
-  fn trace_debug(&self, stdio: &dyn Stdio) -> bool {
+  fn trace_debug(&self, stdio: &mut StdioWrapper) -> bool {
     self.name.trace_debug(stdio);
     self.chunk.constants.iter().for_each(|constant| {
       constant.trace_debug(stdio);
@@ -514,7 +514,7 @@ impl<T: 'static + Trace> Trace for LyVec<T> {
     true
   }
 
-  fn trace_debug(&self, stdio: &dyn Stdio) -> bool {
+  fn trace_debug(&self, stdio: &mut StdioWrapper) -> bool {
     self.iter().for_each(|value| {
       value.trace_debug(stdio);
     });
@@ -604,7 +604,7 @@ impl<T: 'static + Trace> Trace for LyHashMap<T, T> {
     true
   }
 
-  fn trace_debug(&self, stdio: &dyn Stdio) -> bool {
+  fn trace_debug(&self, stdio: &mut StdioWrapper) -> bool {
     self.iter().for_each(|(key, value)| {
       key.trace_debug(stdio);
       value.trace_debug(stdio);
@@ -692,7 +692,7 @@ impl Trace for Closure {
     true
   }
 
-  fn trace_debug(&self, stdio: &dyn Stdio) -> bool {
+  fn trace_debug(&self, stdio: &mut StdioWrapper) -> bool {
     self.upvalues.iter().for_each(|upvalue| {
       upvalue.trace_debug(stdio);
     });
@@ -840,7 +840,7 @@ impl Trace for Class {
     true
   }
 
-  fn trace_debug(&self, stdio: &dyn Stdio) -> bool {
+  fn trace_debug(&self, stdio: &mut StdioWrapper) -> bool {
     self.name.trace_debug(stdio);
     self.init.map(|init| init.trace_debug(stdio));
 
@@ -925,7 +925,7 @@ impl Trace for Instance {
     true
   }
 
-  fn trace_debug(&self, stdio: &dyn Stdio) -> bool {
+  fn trace_debug(&self, stdio: &mut StdioWrapper) -> bool {
     self.class.trace_debug(stdio);
 
     self.fields.for_each(|(key, val)| {
@@ -984,7 +984,7 @@ impl Trace for Method {
     true
   }
 
-  fn trace_debug(&self, stdio: &dyn Stdio) -> bool {
+  fn trace_debug(&self, stdio: &mut StdioWrapper) -> bool {
     self.receiver.trace_debug(stdio);
     self.method.trace_debug(stdio);
     true

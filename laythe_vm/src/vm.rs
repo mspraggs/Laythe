@@ -19,12 +19,13 @@ use laythe_core::{
   CallResult, LyError,
 };
 use laythe_env::{
-  env::Envio,
-  fs::Fsio,
-  io::{Io, NativeIo},
+  io::{IoWrapper},
   managed::{Managed, Trace},
   memory::{Gc, NO_GC},
-  stdio::Stdio,
+  stdio::{StdioWrapper},
+};
+use laythe_native::{
+  io::NativeIo
 };
 use laythe_lib::{create_std_lib, global::builtin_from_global_module, GLOBAL, STD};
 use std::convert::TryInto;
@@ -56,15 +57,15 @@ pub enum RunMode {
   CallFunction(usize),
 }
 
-pub fn default_native_vm() -> Vm<NativeIo> {
-  let io = NativeIo();
+pub fn default_native_vm() -> Vm {
+  let io = IoWrapper::new(Box::new(NativeIo::default()));
   Vm::new(io)
 }
 
 /// A set of dependencies needed by the virtual machine
-pub struct VmDependencies<I: Io + 'static> {
+pub struct VmDependencies {
   /// access to the environments io
-  io: I,
+  io: IoWrapper,
 
   /// The garbage collector
   gc: Gc,
@@ -80,7 +81,7 @@ pub struct VmDependencies<I: Io + 'static> {
 }
 
 /// The virtual machine for the laythe programming language
-pub struct Vm<I: Io + 'static> {
+pub struct Vm {
   /// A stack holding all local variable currently in use
   stack: Vec<Value>,
 
@@ -91,18 +92,18 @@ pub struct Vm<I: Io + 'static> {
   gc: Gc,
 
   /// The environments io access
-  io: I,
+  io: IoWrapper,
 
   /// an object to manage the current dependencies
-  dep_manager: Managed<DepManager<I>>,
+  dep_manager: Managed<DepManager>,
 
   /// The global module
   global: Managed<Module>,
 }
 
-impl<I: Io> Vm<I> {
-  pub fn new(io: I) -> Vm<I> {
-    let gc = Gc::new(Box::new(io.stdio()));
+impl Vm {
+  pub fn new(io: IoWrapper) -> Vm {
+    let gc = Gc::new(io.stdio());
     let mut no_gc_context = NoContext::new(&gc);
     let hooks = GcHooks::new(&mut no_gc_context);
 
@@ -152,7 +153,7 @@ impl<I: Io> Vm<I> {
 
   /// Start the interactive repl
   pub fn repl(&mut self) {
-    let stdio = self.io.stdio();
+    let mut stdio = self.io.stdio();
 
     let main_module = self
       .main_module(self.dep_manager.src_dir.join(PathBuf::from(REPL_MODULE)))
@@ -161,8 +162,8 @@ impl<I: Io> Vm<I> {
     loop {
       let mut buffer = String::new();
 
-      stdio.print("> ");
-      stdio.flush().expect("Could not write to stdout");
+      write!(stdio.stdout(), "> ");
+      stdio.stdout().flush().expect("Could not write to stdout");
 
       match stdio.read_line(&mut buffer) {
         Ok(_) => {
@@ -191,7 +192,7 @@ impl<I: Io> Vm<I> {
         self.interpret(main_module, source)
       }
       Err(err) => {
-        self.io.stdio().println(&err.message);
+        writeln!(self.io.stdio().stdout(), "{}", &err.message);
         ExecuteResult::RuntimeError
       }
     }
@@ -218,7 +219,7 @@ impl<I: Io> Vm<I> {
     let mut compiler_context = NoContext::new(&self.gc);
     let hooks = GcHooks::new(&mut compiler_context);
 
-    let compiler = Compiler::new(module, self.io.clone(), &mut parser, &hooks);
+    let compiler = Compiler::new(module, &mut parser, &hooks);
     compiler.compile()
   }
 
@@ -226,13 +227,13 @@ impl<I: Io> Vm<I> {
     let no_gc_context = NoContext::new(&self.gc);
     let hooks = GcHooks::new(&no_gc_context);
 
+    let mut stdio = self.io.stdio();
+    let stdout = stdio.stdout();
+
     let module = match Module::from_path(&hooks, hooks.manage(module_path)) {
       Ok(module) => module,
       Err(err) => {
-        self
-          .io
-          .stdio()
-          .println(&*err.message);
+        writeln!(stdout, "{}", &*err.message);
         return Err(ExecuteResult::RuntimeError);
       }
     };
@@ -241,7 +242,7 @@ impl<I: Io> Vm<I> {
     match self.global.transfer_exported(&hooks, &mut module) {
       Ok(_) => {}
       Err(_) => {
-        self.io.stdio().println("Transfer global module failed.");
+        writeln!(stdout, "Transfer global module failed.");
         return Err(ExecuteResult::RuntimeError);
       }
     }
@@ -250,10 +251,10 @@ impl<I: Io> Vm<I> {
   }
 }
 
-impl<I: Io> From<VmDependencies<I>> for Vm<I> {
+impl From<VmDependencies> for Vm {
   /// Construct a vm from a set of dependencies. This is meant to be used when targeting
   /// different environments
-  fn from(dependencies: VmDependencies<I>) -> Self {
+  fn from(dependencies: VmDependencies) -> Self {
     let gc = dependencies.gc;
     let mut no_gc_context = NoContext::new(&gc);
     let hooks = GcHooks::new(&mut no_gc_context);
@@ -296,7 +297,7 @@ impl<I: Io> From<VmDependencies<I>> for Vm<I> {
   }
 }
 
-struct VmExecutor<'a, I: Io + 'static> {
+struct VmExecutor<'a> {
   /// A stack of call frames for the current execution
   frames: &'a mut Vec<CallFrame>,
 
@@ -307,13 +308,13 @@ struct VmExecutor<'a, I: Io + 'static> {
   global: Managed<Module>,
 
   /// the standard lib package
-  dep_manager: Managed<DepManager<I>>,
+  dep_manager: Managed<DepManager>,
 
   /// A reference to a object currently in the vm
   gc: &'a mut Gc,
 
   /// The environments io access
-  io: &'a I,
+  io: &'a IoWrapper,
 
   /// A collection of currently available upvalues
   open_upvalues: Vec<Managed<Upvalue>>,
@@ -337,9 +338,9 @@ struct VmExecutor<'a, I: Io + 'static> {
   frame_count: usize,
 }
 
-impl<'a, I: Io> VmExecutor<'a, I> {
+impl<'a> VmExecutor<'a> {
   /// Create an instance of the vm executor that can execute the provided script.
-  pub fn new(vm: &'a mut Vm<I>, script: Value) -> VmExecutor<'a, I> {
+  pub fn new(vm: &'a mut Vm, script: Value) -> VmExecutor<'a> {
     let current_frame = { &mut vm.frames[0] };
     let current_fun = current_frame.closure.fun;
     let stack_top = &mut vm.stack[1] as *mut Value;
@@ -1308,7 +1309,8 @@ impl<'a, I: Io> VmExecutor<'a, I> {
   }
 
   fn op_print(&mut self) -> Signal {
-    self.io.stdio().println(&format!("{}", self.pop()));
+    let mut stdio = self.io.stdio();
+    writeln!(stdio.stdout(), "{}", self.pop());
     Signal::Ok
   }
 
@@ -1735,8 +1737,9 @@ impl<'a, I: Io> VmExecutor<'a, I> {
   fn print_error(&mut self, error: &LyError) {
     let message = error.message;
 
-    let stdio = self.io.stdio();
-    stdio.eprintln(&*message);
+    let mut stdio = self.io.stdio();
+    let stderr = stdio.stderr();
+    writeln!(stderr, "{}", &*message);
 
     for frame in self.frames[1..self.frame_count].iter().rev() {
       let closure = &frame.closure;
@@ -1746,18 +1749,17 @@ impl<'a, I: Io> VmExecutor<'a, I> {
       };
 
       let offset = ptr_len(&closure.fun.chunk().instructions[0], frame.ip);
-      stdio.eprintln(&format!(
-        "[line {}] in {}",
+      writeln!(stderr, "[line {}] in {}",
         closure.fun.chunk().get_line(offset),
         location
-      ));
+      );
     }
 
     self.reset_stack();
   }
 }
 
-impl<'a, I: Io> Trace for VmExecutor<'a, I> {
+impl<'a> Trace for VmExecutor<'a> {
   fn trace(&self) -> bool {
     self.script.trace();
 
@@ -1785,7 +1787,7 @@ impl<'a, I: Io> Trace for VmExecutor<'a, I> {
     true
   }
 
-  fn trace_debug(&self, stdio: &dyn Stdio) -> bool {
+  fn trace_debug(&self, stdio: &mut StdioWrapper) -> bool {
     self.script.trace_debug(stdio);
 
     unsafe {
@@ -1813,7 +1815,7 @@ impl<'a, I: Io> Trace for VmExecutor<'a, I> {
   }
 }
 
-impl<'a, I: Io> HookContext for VmExecutor<'a, I> {
+impl<'a> HookContext for VmExecutor<'a> {
   fn gc_context(&self) -> &dyn GcContext {
     self
   }
@@ -1821,15 +1823,19 @@ impl<'a, I: Io> HookContext for VmExecutor<'a, I> {
   fn call_context(&mut self) -> &mut dyn CallContext {
     self
   }
+
+  fn io_context(&mut self) -> &mut dyn laythe_core::hooks::IoContext {
+    todo!()
+  }
 }
 
-impl<'a, I: Io> GcContext for VmExecutor<'a, I> {
+impl<'a> GcContext for VmExecutor<'a> {
   fn gc(&self) -> &Gc {
     self.gc
   }
 }
 
-impl<'a, I: Io> CallContext for VmExecutor<'a, I> {
+impl<'a> CallContext for VmExecutor<'a> {
   fn call(&mut self, callable: Value, args: &[Value]) -> CallResult {
     let result = self.run_fun(callable, args);
     self.to_call_result(result)

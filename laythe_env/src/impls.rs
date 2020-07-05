@@ -8,7 +8,7 @@ impl Trace for PathBuf {
   fn trace(&self) -> bool {
     true
   }
-  fn trace_debug(&self, _: &StdioWrapper) -> bool {
+  fn trace_debug(&self, _: &mut StdioWrapper) -> bool {
     true
   }
 }
@@ -33,7 +33,7 @@ impl Trace for String {
     true
   }
 
-  fn trace_debug(&self, _: &StdioWrapper) -> bool {
+  fn trace_debug(&self, _: &mut StdioWrapper) -> bool {
     true
   }
 }

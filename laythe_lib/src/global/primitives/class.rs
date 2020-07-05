@@ -9,7 +9,7 @@ use laythe_core::{
   value::{Value, VALUE_NIL},
   CallResult, LyResult,
 };
-use laythe_env::{managed::Trace, stdio::Stdio};
+use laythe_env::{managed::Trace, stdio::StdioWrapper};
 
 pub const CLASS_CLASS_NAME: &'static str = "Class";
 

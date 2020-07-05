@@ -99,12 +99,12 @@ mod test {
     object::Fun,
     signature::Arity,
     value::{Value, ValueKind},
-    CallResult, LyError, LyResult,
+    CallResult, LyError,
   };
   use laythe_env::{
     managed::{Managed, Trace},
     memory::{Gc, NoGc, NO_GC},
-    stdio::Stdio,
+    stdio::{StdioWrapper},
   };
   use std::path::PathBuf;
 
@@ -133,6 +133,10 @@ mod test {
 
     fn call_context(&mut self) -> &mut dyn CallContext {
       self
+    }
+
+    fn io_context(&mut self) -> &mut dyn laythe_core::hooks::IoContext {
+      todo!()
     }
   }
 
@@ -270,7 +274,7 @@ mod test {
       self.no_gc.trace()
     }
 
-    fn trace_debug(&self, stdio: &dyn Stdio) -> bool {
+    fn trace_debug(&self, stdio: &mut StdioWrapper) -> bool {
       self.no_gc.trace_debug(stdio)
     }
   }

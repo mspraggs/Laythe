@@ -1,15 +1,18 @@
 
-#[derive(Clone)]
-pub struct NativeEnvIo();
+use laythe_env::env::Envio;
+use std::{io, env, path::PathBuf};
 
-impl Default for NativeEnvIo {
+#[derive(Clone)]
+pub struct NativeEnvio();
+
+impl Default for NativeEnvio {
   fn default() -> Self {
     Self()
   }
 }
 
-impl EnvIo for NativeEnvIo {
-  fn current_dir(&self) -> Result<PathBuf> {
+impl Envio for NativeEnvio {
+  fn current_dir(&self) -> io::Result<PathBuf> {
     env::current_dir()
   }
 

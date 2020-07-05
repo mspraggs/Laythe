@@ -7,19 +7,18 @@ use laythe_core::{
   LyResult,
 };
 use laythe_env::{
-  fs::Fsio,
-  io::Io,
+  io::{IoWrapper, Io},
   managed::{Manage, Managed, Trace},
-  stdio::Stdio,
+  stdio::{StdioWrapper},
 };
 use std::{fmt, mem, path::PathBuf};
 
-pub struct DepManager<I: Io> {
+pub struct DepManager {
   /// The directory of the entry point
   pub src_dir: Managed<PathBuf>,
 
   /// interface to the current environments io
-  io: I,
+  io: IoWrapper,
 
   /// A collection of builtin in classes, values and functions
   builtin: BuiltIn,
@@ -31,9 +30,9 @@ pub struct DepManager<I: Io> {
   cache: LyHashMap<Managed<String>, Managed<Module>>,
 }
 
-impl<I: Io> DepManager<I> {
+impl DepManager {
   /// Create a new dependency manager
-  pub fn new(io: I, builtin: BuiltIn, src_dir: Managed<PathBuf>) -> Self {
+  pub fn new(io: IoWrapper, builtin: BuiltIn, src_dir: Managed<PathBuf>) -> Self {
     Self {
       io,
       src_dir,
@@ -113,7 +112,7 @@ impl<I: Io> DepManager<I> {
   }
 }
 
-impl<I: Io> fmt::Debug for DepManager<I> {
+impl fmt::Debug for DepManager {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     f.debug_struct("DepManager")
       .field("io", &self.io)
@@ -124,7 +123,7 @@ impl<I: Io> fmt::Debug for DepManager<I> {
   }
 }
 
-impl<I: Io> Trace for DepManager<I> {
+impl Trace for DepManager {
   fn trace(&self) -> bool {
     self.src_dir.trace();
     self.packages.iter().for_each(|(key, value)| {
@@ -135,7 +134,7 @@ impl<I: Io> Trace for DepManager<I> {
     true
   }
 
-  fn trace_debug(&self, stdio: &dyn Stdio) -> bool {
+  fn trace_debug(&self, stdio: &mut StdioWrapper) -> bool {
     self.src_dir.trace_debug(stdio);
     self.packages.iter().for_each(|(key, value)| {
       key.trace_debug(stdio);
@@ -146,7 +145,7 @@ impl<I: Io> Trace for DepManager<I> {
   }
 }
 
-impl<I: Io> Manage for DepManager<I> {
+impl Manage for DepManager {
   fn alloc_type(&self) -> &str {
     "Dependency Manager"
   }

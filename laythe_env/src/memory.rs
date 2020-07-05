@@ -413,7 +413,7 @@ impl<'a> Gc {
 
 impl<'a> Default for Gc {
   fn default() -> Self {
-    Gc::new(Box::new(NativeStdIo()))
+    Gc::new(StdioWrapper::default())
   }
 }
 pub struct NoGc();
@@ -429,7 +429,7 @@ impl Trace for NoGc {
     false
   }
 
-  fn trace_debug(&self, _: &StdioWrapper) -> bool {
+  fn trace_debug(&self, _: &mut StdioWrapper) -> bool {
     false
   }
 }
@@ -443,7 +443,7 @@ mod test {
   #[test]
   fn dyn_manage() {
     let dyn_trace: Box<dyn Trace> = Box::new(NoGc());
-    let gc = Gc::new(Box::new(NativeStdIo()));
+    let gc = Gc::default();
 
     let dyn_manged_str = gc.manage("managed".to_string(), &*dyn_trace);
     assert_eq!(*dyn_manged_str, "managed".to_string());

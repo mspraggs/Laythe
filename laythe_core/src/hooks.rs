@@ -5,7 +5,7 @@ use crate::{
 use laythe_env::{
   managed::{Manage, Managed, Trace},
   memory::Gc,
-  stdio::Stdio, io::Io,
+  stdio::{StdioWrapper}, io::IoWrapper,
 };
 
 /// A set of commands that a native function to request from it's surrounding
@@ -48,7 +48,7 @@ impl<'a> Hooks<'a> {
     CallHooks::new(self.context.call_context())
   }
 
-  pub fn to_io(&self) -> IoHooks {
+  pub fn to_io(&mut self) -> IoHooks {
     IoHooks::new(self.context.io_context())
   }
 
@@ -251,7 +251,6 @@ impl<'a> CallHooks<'a> {
   }
 }
 
-
 pub struct IoHooks<'a> {
   context: &'a dyn IoContext,
 }
@@ -266,7 +265,7 @@ impl<'a> IoHooks<'a> {
 pub trait HookContext {
   fn gc_context(&self) -> &dyn GcContext;
   fn call_context(&mut self) -> &mut dyn CallContext;
-  fn io_context(&mut self) -> &dyn IoContext;
+  fn io_context(&mut self) -> &mut dyn IoContext;
 }
 
 /// A set of functionality required by the hooks objects in order to operate
@@ -293,13 +292,14 @@ pub trait CallContext {
 }
 
 pub trait IoContext {
-  fn io(&self) -> &I;
+  fn io(&self) -> &mut IoWrapper;
 }
 
-/// A placeholder context that does not gc and does not call functionsself.context)
+/// A placeholder context that does not gc and does not call functions
 pub struct NoContext<'a> {
   /// A reference to a gc just to allocate
   gc: &'a Gc,
+
 }
 
 impl<'a> NoContext<'a> {
@@ -313,7 +313,8 @@ impl<'a> Trace for NoContext<'a> {
   fn trace(&self) -> bool {
     false
   }
-  fn trace_debug(&self, _stdio: &dyn Stdio) -> bool {
+
+  fn trace_debug(&self, _stdio: &mut StdioWrapper) -> bool {
     false
   }
 }
@@ -327,7 +328,7 @@ impl<'a> HookContext for NoContext<'a> {
     self
   }
 
-  fn io_context(&mut self) -> &dyn IoContext {
+  fn io_context(&mut self) -> &mut dyn IoContext {
     self
   }
 }
@@ -358,6 +359,7 @@ impl<'a> CallContext for NoContext<'a> {
 }
 
 impl<'a> IoContext for NoContext<'a> {
-  fn io(&self) -> &I {
+  fn io(&self) -> &mut IoWrapper {
+    todo!()
   }
 }

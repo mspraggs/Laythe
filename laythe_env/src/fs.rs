@@ -13,19 +13,19 @@ impl FsWrapper {
     Self { fs }
   }
 
-  fn read_file(&self, path: &Path) -> Result<String, SlIoError> {
+  pub fn read_file(&self, path: &Path) -> Result<String, SlIoError> {
     self.fs.read_file(path)
   }
 
-  fn read_directory(&self, path: &Path) -> io::Result<SlDirEntry> {
+  pub fn read_directory(&self, path: &Path) -> io::Result<SlDirEntry> {
     self.fs.read_directory(path)
   }
 
-  fn canonicalize(&self, path: &Path) -> Result<PathBuf, SlIoError> {
+  pub fn canonicalize(&self, path: &Path) -> Result<PathBuf, SlIoError> {
     self.fs.canonicalize(path)
   }
 
-  fn relative_path(&self, base: &PathBuf, import: &Path) -> Result<PathBuf, SlIoError> {
+  pub fn relative_path(&self, base: &PathBuf, import: &Path) -> Result<PathBuf, SlIoError> {
     self.fs.relative_path(base, import)
   }
 }
@@ -42,16 +42,16 @@ pub trait Fsio {
 pub struct MockFsio();
 
 impl Fsio for MockFsio {
-  fn read_file(&self, path: &Path) -> Result<String, SlIoError> {
+  fn read_file(&self, _path: &Path) -> Result<String, SlIoError> {
     Ok("let x = 10;".to_string())
   }
-  fn read_directory(&self, path: &Path) -> io::Result<SlDirEntry> {
+  fn read_directory(&self, _path: &Path) -> io::Result<SlDirEntry> {
     Ok(SlDirEntry())
   }
   fn canonicalize(&self, path: &Path) -> Result<PathBuf, SlIoError> {
     Ok(path.to_path_buf())
   }
-  fn relative_path(&self, base: &PathBuf, import: &Path) -> Result<PathBuf, SlIoError> {
+  fn relative_path(&self, _base: &PathBuf, import: &Path) -> Result<PathBuf, SlIoError> {
     Ok(import.to_path_buf())
   }
 }
