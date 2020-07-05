@@ -1,37 +1,50 @@
 use crate::{
-  env::{EnvIo, NativeEnvIo},
-  fs::{FsIo, NativeFsIo},
-  stdio::{NativeStdIo, StdIo},
+  env::{MockEnvio, EnvWrapper},
+  fs::{MockFsio, FsWrapper},
+  stdio::StdioWrapper,
 };
 use std::fmt;
 
-pub trait Io: fmt::Debug + Default + Clone {
-  type StdIo: StdIo + Clone;
-  type FsIo: FsIo + Clone;
-  type EnvIo: EnvIo + Clone;
-
-  fn stdio(&self) -> Self::StdIo;
-  fn fsio(&self) -> Self::FsIo;
-  fn envio(&self) -> Self::EnvIo;
+pub struct IoWrapper {
+  io: Box<dyn Io>,
 }
 
-#[derive(Debug, Default, Clone, Copy)]
-pub struct NativeIo();
-
-impl Io for NativeIo {
-  type StdIo = NativeStdIo;
-  type FsIo = NativeFsIo;
-  type EnvIo = NativeEnvIo;
-
-  fn stdio(&self) -> Self::StdIo {
-    NativeStdIo()
+impl IoWrapper {
+  pub fn new(io: Box<dyn Io>) -> Self {
+    Self { io }
   }
 
-  fn fsio(&self) -> Self::FsIo {
-    NativeFsIo()
+  pub fn stdio(&self) -> StdioWrapper {
+    self.io.stdio()
   }
 
-  fn envio(&self) -> Self::EnvIo {
-    NativeEnvIo()
+  pub fn fsio(&self) -> FsWrapper {
+    self.io.fsio()
+  }
+
+  pub fn envio(&self) -> EnvWrapper {
+    self.io.envio()
   }
 }
+
+pub trait Io: fmt::Debug {
+  fn stdio(&self) -> StdioWrapper;
+  fn fsio(&self) -> FsWrapper;
+  fn envio(&self) -> EnvWrapper;
+}
+
+#[derive(Debug)]
+pub struct MockIo();
+
+impl Io for MockIo {
+  fn stdio(&self) -> StdioWrapper {
+    todo!()
+  }
+  fn fsio(&self) -> FsWrapper {
+    FsWrapper::new(Box::new(MockFsio()))
+  }
+  fn envio(&self) -> EnvWrapper {
+    EnvWrapper::new(Box::new(MockEnvio()))
+  }
+}
+

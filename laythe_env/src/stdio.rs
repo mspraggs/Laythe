@@ -1,40 +1,56 @@
-use std::io::{stdin, stdout, Result, Write};
+use std::io;
+use io::{Read, Write};
 
-pub trait StdIo {
-  fn print(&self, message: &str);
-  fn println(&self, message: &str);
-  fn eprint(&self, message: &str);
-  fn eprintln(&self, message: &str);
-  fn flush(&self) -> Result<()>;
-  fn read_line(&self, buffer: &mut String) -> Result<usize>;
+pub struct StdioWrapper {
+  stdio: Box<dyn Stdio>,
 }
 
-#[derive(Debug, Clone)]
-pub struct NativeStdIo();
+impl StdioWrapper {
+  pub fn new(stdio: Box<dyn Stdio>) -> Self {
+    Self { stdio }
+  }
 
-impl Default for NativeStdIo {
-  fn default() -> Self {
-    Self()
+  pub fn stdout(&self) -> &dyn Write {
+    self.stdio.stdout()
+  }
+
+  pub fn stderr(&self) -> &dyn Write {
+    self.stdio.stderr()
+  }
+
+  pub fn stdin(&self) -> &dyn Read {
+    self.stdio.stdin()
+  }
+
+  pub fn read_line(&self, buffer: &mut String) -> io::Result<usize> {
+    self.stdio.read_line(buffer)
   }
 }
 
-impl StdIo for NativeStdIo {
-  fn print(&self, message: &str) {
-    print!("{}", message);
+pub trait Stdio {
+  fn stdout(&self) -> &dyn Write;
+  fn stderr(&self) -> &dyn Write;
+  fn stdin(&self) -> &dyn Read;
+
+  fn read_line(&self, buffer: &mut String) -> io::Result<usize>;
+}
+
+
+pub struct MockStdio();
+
+impl Stdio for MockStdio {
+  fn stdout(&self) -> &dyn Write {
+      todo!()
   }
-  fn println(&self, message: &str) {
-    println!("{}", message);
+  fn stderr(&self) -> &dyn Write {
+      todo!()
   }
-  fn eprint(&self, message: &str) {
-    eprint!("{}", message);
+  fn stdin(&self) -> &dyn Read {
+      todo!()
   }
-  fn eprintln(&self, message: &str) {
-    eprintln!("{}", message);
-  }
-  fn flush(&self) -> Result<()> {
-    stdout().flush()
-  }
-  fn read_line(&self, buffer: &mut String) -> Result<usize> {
-    stdin().read_line(buffer)
+  fn read_line(&self, buffer: &mut String) -> io::Result<usize> {
+      todo!()
   }
 }
+
+pub struct  MockWrite();

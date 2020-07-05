@@ -22,17 +22,11 @@ fn bool() -> Result<(), std::io::Error> {
 #[test]
 fn class() -> Result<(), std::io::Error> {
   test_files(
-    &vec![
-      "std_lib/builtin/class/superClass.ly",
-    ],
+    &vec!["std_lib/builtin/class/superClass.ly"],
     ExecuteResult::Ok,
   )?;
 
-  test_files(
-    &vec![
-    ],
-    ExecuteResult::RuntimeError,
-  )
+  test_files(&vec![], ExecuteResult::RuntimeError)
 }
 
 #[test]

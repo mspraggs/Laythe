@@ -1,5 +1,5 @@
 use crate::managed::{Allocation, Manage, Managed, Trace};
-use crate::stdio::StdIo;
+use crate::stdio::StdioWrapper;
 use hashbrown::HashMap;
 use std::cell::{Cell, RefCell};
 use std::fmt;
@@ -11,7 +11,7 @@ use std::ptr::NonNull;
 pub struct Gc {
   /// Io in the given environment
   #[allow(dead_code)]
-  stdio: Box<dyn StdIo>,
+  stdio: StdioWrapper,
 
   /// The nursery heap for new objects initially allocated into this gc
   nursery_heap: RefCell<Vec<Box<Allocation<dyn Manage>>>>,
@@ -47,7 +47,7 @@ impl<'a> Gc {
   ///
   /// let gc = Gc::new(Box::new(NativeStdIo()));
   /// ```
-  pub fn new(stdio: Box<dyn StdIo>) -> Self {
+  pub fn new(stdio: StdioWrapper) -> Self {
     Gc {
       stdio,
       nursery_heap: RefCell::new(Vec::with_capacity(1000)),
@@ -413,8 +413,6 @@ impl<'a> Gc {
 
 impl<'a> Default for Gc {
   fn default() -> Self {
-    use crate::stdio::NativeStdIo;
-
     Gc::new(Box::new(NativeStdIo()))
   }
 }
@@ -431,7 +429,7 @@ impl Trace for NoGc {
     false
   }
 
-  fn trace_debug(&self, _: &dyn StdIo) -> bool {
+  fn trace_debug(&self, _: &StdioWrapper) -> bool {
     false
   }
 }
@@ -441,7 +439,6 @@ pub static NO_GC: NoGc = NoGc();
 #[cfg(test)]
 mod test {
   use super::*;
-  use crate::stdio::NativeStdIo;
 
   #[test]
   fn dyn_manage() {

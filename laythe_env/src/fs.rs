@@ -1,51 +1,59 @@
-use crate::{Error, SlIoError};
+use crate::SlIoError;
 use std::{
-  fs::{canonicalize, read_to_string},
   io,
   path::{Path, PathBuf},
 };
 
-pub trait FsIo {
+pub struct FsWrapper {
+  fs: Box<dyn Fsio>,
+}
+
+impl FsWrapper {
+  pub fn new(fs: Box<dyn Fsio>) -> Self {
+    Self { fs }
+  }
+
+  fn read_file(&self, path: &Path) -> Result<String, SlIoError> {
+    self.fs.read_file(path)
+  }
+
+  fn read_directory(&self, path: &Path) -> io::Result<SlDirEntry> {
+    self.fs.read_directory(path)
+  }
+
+  fn canonicalize(&self, path: &Path) -> Result<PathBuf, SlIoError> {
+    self.fs.canonicalize(path)
+  }
+
+  fn relative_path(&self, base: &PathBuf, import: &Path) -> Result<PathBuf, SlIoError> {
+    self.fs.relative_path(base, import)
+  }
+}
+
+pub struct SlDirEntry();
+
+pub trait Fsio {
   fn read_file(&self, path: &Path) -> Result<String, SlIoError>;
   fn read_directory(&self, path: &Path) -> io::Result<SlDirEntry>;
   fn canonicalize(&self, path: &Path) -> Result<PathBuf, SlIoError>;
   fn relative_path(&self, base: &PathBuf, import: &Path) -> Result<PathBuf, SlIoError>;
 }
 
-pub struct SlDirEntry {}
+pub struct MockFsio();
 
-#[derive(Clone)]
-pub struct NativeFsIo();
-
-impl Default for NativeFsIo {
-  fn default() -> Self {
-    Self()
-  }
-}
-
-impl FsIo for NativeFsIo {
+impl Fsio for MockFsio {
   fn read_file(&self, path: &Path) -> Result<String, SlIoError> {
-    match read_to_string(path) {
-      Ok(file_contents) => Ok(file_contents),
-      Err(_) => panic!(),
-    }
+    Ok("let x = 10;".to_string())
   }
-
+  fn read_directory(&self, path: &Path) -> io::Result<SlDirEntry> {
+    Ok(SlDirEntry())
+  }
   fn canonicalize(&self, path: &Path) -> Result<PathBuf, SlIoError> {
-    canonicalize(path).map_err(|_| SlIoError::new(Error::InvalidPath, format!("failed {:?}", path)))
+    Ok(path.to_path_buf())
   }
-
-  fn read_directory(&self, _path: &Path) -> io::Result<SlDirEntry> {
-    todo!()
-  }
-
   fn relative_path(&self, base: &PathBuf, import: &Path) -> Result<PathBuf, SlIoError> {
-    match import.strip_prefix(base) {
-      Ok(relative) => Ok(PathBuf::from(relative)),
-      Err(_) => Err(SlIoError::new(
-        Error::InvalidPath,
-        "Import was not a child of the base path".to_string(),
-      )),
-    }
+    Ok(import.to_path_buf())
   }
 }
+
+

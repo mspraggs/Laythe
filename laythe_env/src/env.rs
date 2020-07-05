@@ -1,26 +1,36 @@
-use std::env;
-use std::{io::Result, path::PathBuf};
+use std::{io, path::PathBuf};
 
-pub trait EnvIo {
-  fn current_dir(&self) -> Result<PathBuf>;
-  fn args(&self) -> Vec<String>;
+pub struct EnvWrapper {
+  env: Box<dyn Envio>,
 }
 
-#[derive(Clone)]
-pub struct NativeEnvIo();
-
-impl Default for NativeEnvIo {
-  fn default() -> Self {
-    Self()
+impl EnvWrapper {
+  pub fn new(env: Box<dyn Envio>) -> Self {
+    Self { env }
   }
-}
 
-impl EnvIo for NativeEnvIo {
-  fn current_dir(&self) -> Result<PathBuf> {
-    env::current_dir()
+  fn current_dir(&self) -> io::Result<PathBuf> {
+    self.env.current_dir()
   }
 
   fn args(&self) -> Vec<String> {
-    env::args().collect()
+    self.env.args()
+  }
+}
+
+pub trait Envio {
+  fn current_dir(&self) -> io::Result<PathBuf>;
+  fn args(&self) -> Vec<String>;
+}
+
+pub struct MockEnvio();
+
+impl Envio for MockEnvio {
+  fn current_dir(&self) -> io::Result<PathBuf> {
+    Ok(PathBuf::new())
+  }
+
+  fn args(&self) -> Vec<String> {
+    vec![]
   }
 }

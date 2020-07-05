@@ -94,16 +94,17 @@ use crate::GLOBAL_PATH;
 mod test {
   use laythe_core::{
     hooks::{CallContext, GcContext, GcHooks, HookContext, Hooks},
+    iterator::LyIter,
     module::Module,
     object::Fun,
     signature::Arity,
     value::{Value, ValueKind},
-    CallResult, LyError, iterator::SlIter,
+    CallResult, LyError, LyResult,
   };
   use laythe_env::{
     managed::{Managed, Trace},
     memory::{Gc, NoGc, NO_GC},
-    stdio::StdIo,
+    stdio::Stdio,
   };
   use std::path::PathBuf;
 
@@ -269,7 +270,7 @@ mod test {
       self.no_gc.trace()
     }
 
-    fn trace_debug(&self, stdio: &dyn StdIo) -> bool {
+    fn trace_debug(&self, stdio: &dyn Stdio) -> bool {
       self.no_gc.trace_debug(stdio)
     }
   }
@@ -277,7 +278,6 @@ mod test {
   pub fn test_native_dependencies() -> Box<Gc> {
     Box::new(Gc::default())
   }
-
 
   #[derive(Trace, Debug)]
   pub struct TestIterator {
@@ -290,7 +290,7 @@ mod test {
     }
   }
 
-  impl SlIter for TestIterator {
+  impl LyIter for TestIterator {
     fn name(&self) -> &str {
       "Test Iterator"
     }
@@ -303,7 +303,7 @@ mod test {
       if self.current > 4 {
         return Ok(Value::from(false));
       }
-      
+
       self.current += 1;
       Ok(Value::from(true))
     }
@@ -317,18 +317,15 @@ mod test {
     }
   }
 
-  pub fn test_iter() -> Box<dyn SlIter> {
+  pub fn test_iter() -> Box<dyn LyIter> {
     Box::new(TestIterator::new())
   }
 
   pub fn fun_from_hooks(hooks: &GcHooks, name: String, module_name: &str) -> Managed<Fun> {
-    let module = match Module::from_path(
+    let module = Module::from_path(
       &hooks,
       hooks.manage(PathBuf::from(format!("path/{}.ly", module_name))),
-    ) {
-      Some(module) => module,
-      None => unreachable!(),
-    };
+    ).expect("TODO");
 
     let module = hooks.manage(module);
     hooks.manage(Fun::new(hooks.manage_str(name), module))

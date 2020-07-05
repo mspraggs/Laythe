@@ -1,4 +1,4 @@
-use laythe_env::{env::NativeEnvIo, fs::NativeFsIo, io::Io, stdio::StdIo};
+use laythe_env::{env::NativeEnvIo, fs::NativeFsIo, io::Io, stdio::Stdio};
 use laythe_vm::vm::{ExecuteResult, Vm};
 use std::fs::File;
 use std::io::prelude::*;
@@ -146,7 +146,7 @@ impl Default for MockedStdIo {
   }
 }
 
-impl StdIo for MockedStdIo {
+impl Stdio for MockedStdIo {
   fn print(&self, message: &str) {
     print!("{}", message);
 

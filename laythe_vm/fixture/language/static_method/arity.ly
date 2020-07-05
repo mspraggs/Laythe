@@ -19,3 +19,10 @@ assertEq(Foo.method5(1, 2, 3, 4, 5), 15); // expect: 15
 assertEq(Foo.method6(1, 2, 3, 4, 5, 6), 21); // expect: 21
 assertEq(Foo.method7(1, 2, 3, 4, 5, 6, 7), 28); // expect: 28
 assertEq(Foo.method8(1, 2, 3, 4, 5, 6, 7, 8), 36); // expect: 36
+
+let b = |dude| dude;
+let d = |bro| {
+  return 10;
+};
+
+let c = 10;

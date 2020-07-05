@@ -1,6 +1,6 @@
 extern crate proc_macro;
 
-use crate::stdio::StdIo;
+use crate::stdio::StdioWrapper;
 pub use laythe_macro::*;
 use std::{
   cell::Cell,
@@ -18,7 +18,7 @@ pub trait Trace {
 
   /// Mark all objects that are reachable printing debugging information
   /// for each object
-  fn trace_debug(&self, stdio: &dyn StdIo) -> bool;
+  fn trace_debug(&self, stdio: &StdioWrapper) -> bool;
 }
 
 /// An entity that can be managed and collected by the garbage collector.
@@ -143,7 +143,7 @@ impl<T: 'static + Manage> Trace for Managed<T> {
     true
   }
 
-  fn trace_debug(&self, stdio: &dyn StdIo) -> bool {
+  fn trace_debug(&self, stdio: &StdioWrapper) -> bool {
     if self.obj().mark() {
       return true;
     }
@@ -183,7 +183,7 @@ impl Trace for Managed<dyn Manage> {
     true
   }
 
-  fn trace_debug(&self, stdio: &dyn StdIo) -> bool {
+  fn trace_debug(&self, stdio: &StdioWrapper) -> bool {
     if self.obj().mark() {
       return true;
     }

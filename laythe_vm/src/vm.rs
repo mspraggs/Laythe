@@ -19,12 +19,12 @@ use laythe_core::{
   CallResult, LyError,
 };
 use laythe_env::{
-  env::EnvIo,
-  fs::FsIo,
+  env::Envio,
+  fs::Fsio,
   io::{Io, NativeIo},
   managed::{Managed, Trace},
   memory::{Gc, NO_GC},
-  stdio::StdIo,
+  stdio::Stdio,
 };
 use laythe_lib::{create_std_lib, global::builtin_from_global_module, GLOBAL, STD};
 use std::convert::TryInto;
@@ -227,12 +227,12 @@ impl<I: Io> Vm<I> {
     let hooks = GcHooks::new(&no_gc_context);
 
     let module = match Module::from_path(&hooks, hooks.manage(module_path)) {
-      Some(module) => module,
-      None => {
+      Ok(module) => module,
+      Err(err) => {
         self
           .io
           .stdio()
-          .println("Unable to extract filename from script path.");
+          .println(&*err.message);
         return Err(ExecuteResult::RuntimeError);
       }
     };
@@ -416,7 +416,10 @@ impl<'a, I: Io> VmExecutor<'a, I> {
     method_name: Managed<String>,
     args: &[Value],
   ) -> ExecuteResult {
-    let class = self.dep_manager.primitive_classes().for_value(this, this.kind());
+    let class = self
+      .dep_manager
+      .primitive_classes()
+      .for_value(this, this.kind());
 
     self.push(this);
     for arg in args {
@@ -756,7 +759,10 @@ impl<'a, I: Io> VmExecutor<'a, I> {
       }
     }
 
-    let class = self.dep_manager.primitive_classes().for_value(receiver, receiver.kind());
+    let class = self
+      .dep_manager
+      .primitive_classes()
+      .for_value(receiver, receiver.kind());
     self.invoke_from_class(class, method_name, arg_count)
   }
 
@@ -1074,10 +1080,7 @@ impl<'a, I: Io> VmExecutor<'a, I> {
       _ => (),
     }
 
-    let class = self
-      .dep_manager
-      .primitive_classes()
-      .for_value(value, kind);
+    let class = self.dep_manager.primitive_classes().for_value(value, kind);
 
     self.bind_method(class, name)
   }
@@ -1782,7 +1785,7 @@ impl<'a, I: Io> Trace for VmExecutor<'a, I> {
     true
   }
 
-  fn trace_debug(&self, stdio: &dyn StdIo) -> bool {
+  fn trace_debug(&self, stdio: &dyn Stdio) -> bool {
     self.script.trace_debug(stdio);
 
     unsafe {

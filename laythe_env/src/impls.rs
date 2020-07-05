@@ -1,6 +1,6 @@
 use crate::{
   managed::{Manage, Trace},
-  stdio::StdIo,
+  stdio::StdioWrapper,
 };
 use std::{mem, path::PathBuf};
 
@@ -8,7 +8,7 @@ impl Trace for PathBuf {
   fn trace(&self) -> bool {
     true
   }
-  fn trace_debug(&self, _: &dyn StdIo) -> bool {
+  fn trace_debug(&self, _: &StdioWrapper) -> bool {
     true
   }
 }
@@ -33,7 +33,7 @@ impl Trace for String {
     true
   }
 
-  fn trace_debug(&self, _: &dyn StdIo) -> bool {
+  fn trace_debug(&self, _: &StdioWrapper) -> bool {
     true
   }
 }

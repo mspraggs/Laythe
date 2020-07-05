@@ -14,7 +14,7 @@ use laythe_core::{
 use laythe_env::{
   io::Io,
   managed::{Manage, Managed, Trace},
-  stdio::StdIo,
+  stdio::Stdio,
 };
 use std::convert::TryInto;
 use std::mem;
@@ -1768,7 +1768,7 @@ impl Trace for ClassCompiler {
     true
   }
 
-  fn trace_debug(&self, stdio: &dyn StdIo) -> bool {
+  fn trace_debug(&self, stdio: &dyn Stdio) -> bool {
     self.enclosing.map(|enclosing| {
       enclosing.trace_debug(stdio);
     });
@@ -1799,7 +1799,7 @@ impl Manage for ClassCompiler {
 
 /// The space lox parser. This struct is responsible for
 /// advancing the scanner and checking for specific conditions
-pub struct Parser<'a, S: StdIo> {
+pub struct Parser<'a, S: Stdio> {
   /// The current token
   current: Token,
 
@@ -1819,7 +1819,7 @@ pub struct Parser<'a, S: StdIo> {
   stdio: S,
 }
 
-impl<'a, S: StdIo> Parser<'a, S> {
+impl<'a, S: Stdio> Parser<'a, S> {
   /// Create a new instance of the parser from a source str
   pub fn new(stdio: S, source: &'a str) -> Self {
     Self {

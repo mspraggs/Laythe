@@ -1,10 +1,10 @@
 use crate::call_frame::CallFrame;
 use laythe_core::chunk::{decode_u16, AlignedByteCode, Chunk, UpvalueIndex};
-use laythe_env::stdio::StdIo;
+use laythe_env::stdio::Stdio;
 use std::mem;
 
 /// Indicate where and how an exception was caught
-pub fn exception_catch<S: StdIo>(stdio: &S, frame: &CallFrame, idx: usize) {
+pub fn exception_catch<S: Stdio>(stdio: &S, frame: &CallFrame, idx: usize) {
   stdio.println(&format!(
     "Exception popped {:0>4} frames caught by: {}",
     idx, frame.closure.fun.name
@@ -12,7 +12,7 @@ pub fn exception_catch<S: StdIo>(stdio: &S, frame: &CallFrame, idx: usize) {
 }
 
 /// Write a chunk to console
-pub fn disassemble_chunk<S: StdIo>(stdio: &S, code_chunk: &Chunk, name: &str) {
+pub fn disassemble_chunk<S: Stdio>(stdio: &S, code_chunk: &Chunk, name: &str) {
   stdio.println(&format!("== {0} ==", name));
 
   let mut offset: usize = 0;
@@ -26,7 +26,7 @@ pub fn disassemble_chunk<S: StdIo>(stdio: &S, code_chunk: &Chunk, name: &str) {
 }
 
 /// Write an instruction to console
-pub fn disassemble_instruction<S: StdIo>(
+pub fn disassemble_instruction<S: Stdio>(
   stdio: &S,
   chunk: &Chunk,
   ip: usize,
@@ -132,7 +132,7 @@ pub fn disassemble_instruction<S: StdIo>(
 }
 
 fn jump_instruction(
-  stdio: &impl StdIo,
+  stdio: &impl Stdio,
   name: &str,
   sign: isize,
   jump: u16,
@@ -150,7 +150,7 @@ fn jump_instruction(
 
 /// print a constant
 fn constant_instruction(
-  stdio: &impl StdIo,
+  stdio: &impl Stdio,
   name: &str,
   chunk: &Chunk,
   constant: u16,
@@ -163,7 +163,7 @@ fn constant_instruction(
 
 /// print a closure
 fn closure_instruction(
-  stdio: &impl StdIo,
+  stdio: &impl Stdio,
   name: &str,
   chunk: &Chunk,
   constant: u16,
@@ -209,7 +209,7 @@ fn closure_instruction(
 }
 
 fn invoke_instruction(
-  stdio: &impl StdIo,
+  stdio: &impl Stdio,
   name: &str,
   chunk: &Chunk,
   constant: u16,
@@ -222,19 +222,19 @@ fn invoke_instruction(
 }
 
 /// print a short instruction
-fn short_instruction(stdio: &impl StdIo, name: &str, slot: u16, offset: usize) -> usize {
+fn short_instruction(stdio: &impl Stdio, name: &str, slot: u16, offset: usize) -> usize {
   stdio.println(&format!("{:16} {:5}", name, slot));
   offset
 }
 
 /// print a byte instruction
-fn byte_instruction(stdio: &impl StdIo, name: &str, slot: u8, offset: usize) -> usize {
+fn byte_instruction(stdio: &impl Stdio, name: &str, slot: u8, offset: usize) -> usize {
   stdio.println(&format!("{:16} {:5}", name, slot));
   offset
 }
 
 /// print a simple instruction
-fn simple_instruction(stdio: &impl StdIo, name: &str, offset: usize) -> usize {
+fn simple_instruction(stdio: &impl Stdio, name: &str, offset: usize) -> usize {
   stdio.println(&format!("{:16}", name));
   offset
 }

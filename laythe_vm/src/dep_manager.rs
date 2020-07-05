@@ -7,10 +7,10 @@ use laythe_core::{
   LyResult,
 };
 use laythe_env::{
-  fs::FsIo,
+  fs::Fsio,
   io::Io,
   managed::{Manage, Managed, Trace},
-  stdio::StdIo,
+  stdio::Stdio,
 };
 use std::{fmt, mem, path::PathBuf};
 
@@ -135,7 +135,7 @@ impl<I: Io> Trace for DepManager<I> {
     true
   }
 
-  fn trace_debug(&self, stdio: &dyn StdIo) -> bool {
+  fn trace_debug(&self, stdio: &dyn Stdio) -> bool {
     self.src_dir.trace_debug(stdio);
     self.packages.iter().for_each(|(key, value)| {
       key.trace_debug(stdio);

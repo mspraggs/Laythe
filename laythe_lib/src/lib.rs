@@ -1,5 +1,6 @@
 #![deny(clippy::all)]
 pub mod global;
+mod io;
 mod math;
 mod support;
 
@@ -7,6 +8,7 @@ use global::add_global;
 use laythe_core::{hooks::GcHooks, package::Package, LyResult};
 use laythe_env::managed::Managed;
 use math::add_math;
+use io::add_io;
 
 pub const STD: &str = "std";
 pub const GLOBAL: &str = "global";
@@ -17,6 +19,7 @@ pub fn create_std_lib(hooks: &GcHooks) -> LyResult<Managed<Package>> {
 
   add_global(hooks, std)?;
   add_math(hooks, std)?;
+  add_io(hooks, std)?;
 
   Ok(std)
 }

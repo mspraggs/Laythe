@@ -5,7 +5,7 @@ use crate::{
 use laythe_env::{
   managed::{Manage, Managed, Trace},
   memory::Gc,
-  stdio::StdIo,
+  stdio::Stdio, io::Io,
 };
 
 /// A set of commands that a native function to request from it's surrounding
@@ -46,6 +46,10 @@ impl<'a> Hooks<'a> {
   #[inline]
   pub fn to_call(&mut self) -> CallHooks {
     CallHooks::new(self.context.call_context())
+  }
+
+  pub fn to_io(&self) -> IoHooks {
+    IoHooks::new(self.context.io_context())
   }
 
   /// Provide a function for the surround context to execute
@@ -247,9 +251,28 @@ impl<'a> CallHooks<'a> {
   }
 }
 
+
+pub struct IoHooks<'a> {
+  context: &'a dyn IoContext,
+}
+
+impl<'a> IoHooks<'a> {
+  pub fn new(context: &'a dyn IoContext) -> IoHooks<'a> {
+    Self { context }
+  }
+}
+
+
 pub trait HookContext {
   fn gc_context(&self) -> &dyn GcContext;
   fn call_context(&mut self) -> &mut dyn CallContext;
+  fn io_context(&mut self) -> &dyn IoContext;
+}
+
+/// A set of functionality required by the hooks objects in order to operate
+pub trait GcContext: Trace {
+  /// Get a reference to the context garbage collector
+  fn gc(&self) -> &Gc;
 }
 
 /// A set of functions related to calling laythe values
@@ -269,10 +292,8 @@ pub trait CallContext {
   ) -> CallResult;
 }
 
-/// A set of functionality required by the hooks objects in order to operate
-pub trait GcContext: Trace {
-  /// Get a reference to the context garbage collector
-  fn gc(&self) -> &Gc;
+pub trait IoContext {
+  fn io(&self) -> &I;
 }
 
 /// A placeholder context that does not gc and does not call functionsself.context)
@@ -292,7 +313,7 @@ impl<'a> Trace for NoContext<'a> {
   fn trace(&self) -> bool {
     false
   }
-  fn trace_debug(&self, _stdio: &dyn StdIo) -> bool {
+  fn trace_debug(&self, _stdio: &dyn Stdio) -> bool {
     false
   }
 }
@@ -303,6 +324,10 @@ impl<'a> HookContext for NoContext<'a> {
   }
 
   fn call_context(&mut self) -> &mut dyn CallContext {
+    self
+  }
+
+  fn io_context(&mut self) -> &dyn IoContext {
     self
   }
 }
@@ -329,5 +354,10 @@ impl<'a> CallContext for NoContext<'a> {
     _args: &[Value],
   ) -> CallResult {
     Ok(VALUE_NIL)
+  }
+}
+
+impl<'a> IoContext for NoContext<'a> {
+  fn io(&self) -> &I {
   }
 }
