@@ -5,7 +5,7 @@ use crate::{
 use laythe_env::{
   managed::{Manage, Managed, Trace},
   memory::Gc,
-  stdio::{StdioWrapper}, io::IoWrapper,
+  stdio::{StdioWrapper}, io::{MockIo, IoWrapper},
 };
 
 /// A set of commands that a native function to request from it's surrounding
@@ -48,8 +48,8 @@ impl<'a> Hooks<'a> {
     CallHooks::new(self.context.call_context())
   }
 
-  pub fn to_io(&mut self) -> IoHooks {
-    IoHooks::new(self.context.io_context())
+  pub fn to_io(&mut self) -> IoWrapper {
+    self.context.io()
   }
 
   /// Provide a function for the surround context to execute
@@ -251,21 +251,10 @@ impl<'a> CallHooks<'a> {
   }
 }
 
-pub struct IoHooks<'a> {
-  context: &'a dyn IoContext,
-}
-
-impl<'a> IoHooks<'a> {
-  pub fn new(context: &'a dyn IoContext) -> IoHooks<'a> {
-    Self { context }
-  }
-}
-
-
 pub trait HookContext {
   fn gc_context(&self) -> &dyn GcContext;
   fn call_context(&mut self) -> &mut dyn CallContext;
-  fn io_context(&mut self) -> &mut dyn IoContext;
+  fn io(&mut self) -> IoWrapper;
 }
 
 /// A set of functionality required by the hooks objects in order to operate
@@ -328,8 +317,8 @@ impl<'a> HookContext for NoContext<'a> {
     self
   }
 
-  fn io_context(&mut self) -> &mut dyn IoContext {
-    self
+  fn io(&mut self) -> IoWrapper {
+    IoWrapper::new(Box::new(MockIo()))
   }
 }
 
@@ -355,11 +344,5 @@ impl<'a> CallContext for NoContext<'a> {
     _args: &[Value],
   ) -> CallResult {
     Ok(VALUE_NIL)
-  }
-}
-
-impl<'a> IoContext for NoContext<'a> {
-  fn io(&self) -> &mut IoWrapper {
-    todo!()
   }
 }

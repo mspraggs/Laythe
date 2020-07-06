@@ -36,8 +36,9 @@ mod unboxed {
   };
   use laythe_env::{
     managed::{Managed, Trace},
-    stdio::StdIo,
+    stdio::StdioWrapper,
   };
+
   use std::fmt;
   use std::hash::Hash;
 

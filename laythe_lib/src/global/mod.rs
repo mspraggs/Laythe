@@ -28,10 +28,8 @@ use primitives::{
 use std::path::PathBuf;
 use time::add_clock_funs;
 
-pub fn add_global(hooks: &GcHooks, mut std: Managed<Package>) -> LyResult<()> {
-  let module = Module::from_path(&hooks, hooks.manage(PathBuf::from(GLOBAL_PATH)))?;
-
-  let module = hooks.manage(module);
+pub fn add_global_module(hooks: &GcHooks, mut std: Managed<Package>) -> LyResult<()> {
+  let module = hooks.manage(Module::from_path(&hooks, hooks.manage(PathBuf::from(GLOBAL_PATH)))?);
   std.add_module(hooks, module)?;
 
   add_primitive_classes(hooks, module, std)?;

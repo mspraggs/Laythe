@@ -48,6 +48,7 @@ enum Signal {
 pub enum ExecuteResult {
   Ok,
   FunResult(Value),
+  InternalError,
   RuntimeError,
   CompileError,
 }
@@ -152,7 +153,7 @@ impl Vm {
   }
 
   /// Start the interactive repl
-  pub fn repl(&mut self) {
+  pub fn repl(&mut self) -> ExecuteResult {
     let mut stdio = self.io.stdio();
 
     let main_module = self
@@ -162,7 +163,9 @@ impl Vm {
     loop {
       let mut buffer = String::new();
 
-      write!(stdio.stdout(), "> ");
+      if let Err(_) = write!(stdio.stdout(), "> ") {
+        return ExecuteResult::InternalError
+      }
       stdio.stdout().flush().expect("Could not write to stdout");
 
       match stdio.read_line(&mut buffer) {
@@ -192,7 +195,7 @@ impl Vm {
         self.interpret(main_module, source)
       }
       Err(err) => {
-        writeln!(self.io.stdio().stdout(), "{}", &err.message);
+        writeln!(self.io.stdio().stderr(), "{}", &err.message).expect("Unable to write to stderr");
         ExecuteResult::RuntimeError
       }
     }
@@ -228,12 +231,12 @@ impl Vm {
     let hooks = GcHooks::new(&no_gc_context);
 
     let mut stdio = self.io.stdio();
-    let stdout = stdio.stdout();
+    let stderr = stdio.stderr();
 
     let module = match Module::from_path(&hooks, hooks.manage(module_path)) {
       Ok(module) => module,
       Err(err) => {
-        writeln!(stdout, "{}", &*err.message);
+        writeln!(stderr, "{}", &*err.message).expect("Unable to write to stderr");
         return Err(ExecuteResult::RuntimeError);
       }
     };
@@ -242,7 +245,7 @@ impl Vm {
     match self.global.transfer_exported(&hooks, &mut module) {
       Ok(_) => {}
       Err(_) => {
-        writeln!(stdout, "Transfer global module failed.");
+        writeln!(stderr, "Transfer global module failed.").expect("Unable to write to stderr");
         return Err(ExecuteResult::RuntimeError);
       }
     }
@@ -1310,7 +1313,7 @@ impl<'a> VmExecutor<'a> {
 
   fn op_print(&mut self) -> Signal {
     let mut stdio = self.io.stdio();
-    writeln!(stdio.stdout(), "{}", self.pop());
+    writeln!(stdio.stdout(), "{}", self.pop()).expect("Unable to write to stdout");
     Signal::Ok
   }
 
@@ -1659,6 +1662,9 @@ impl<'a> VmExecutor<'a> {
         Some(error) => Err(error),
         None => self.internal_error("Error not set on vm executor."),
       },
+      ExecuteResult::InternalError => {
+        self.internal_error("Internal error encountered")
+      }
     }
   }
 
@@ -1739,7 +1745,7 @@ impl<'a> VmExecutor<'a> {
 
     let mut stdio = self.io.stdio();
     let stderr = stdio.stderr();
-    writeln!(stderr, "{}", &*message);
+    writeln!(stderr, "{}", &*message).expect("Unable to write to stderr");
 
     for frame in self.frames[1..self.frame_count].iter().rev() {
       let closure = &frame.closure;
@@ -1752,7 +1758,7 @@ impl<'a> VmExecutor<'a> {
       writeln!(stderr, "[line {}] in {}",
         closure.fun.chunk().get_line(offset),
         location
-      );
+      ).expect("Unable to write to stderr");
     }
 
     self.reset_stack();
@@ -1824,8 +1830,8 @@ impl<'a> HookContext for VmExecutor<'a> {
     self
   }
 
-  fn io_context(&mut self) -> &mut dyn laythe_core::hooks::IoContext {
-    todo!()
+  fn io(&mut self) -> IoWrapper {
+    self.io.clone()
   }
 }
 

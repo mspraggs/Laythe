@@ -22,7 +22,7 @@ pub fn disassemble_chunk(stdio: &mut StdioWrapper, code_chunk: &Chunk, name: &st
   while offset < code_chunk.instructions.len() {
     let temp = disassemble_instruction(stdio, code_chunk, offset, last_offset);
     last_offset = offset;
-    offset = temp;
+    offset = temp?;
   }
 
   Ok(())
@@ -142,15 +142,15 @@ fn jump_instruction(
   sign: isize,
   jump: u16,
   offset: usize,
-) -> usize {
+) -> io::Result<usize> {
   let net_jump = sign * (jump as isize);
-  stdout.write_fmt(format_args!(
+  writeln!(stdout,
     "{:16} {:5} -> {}\n",
     name,
     offset - 3,
     (offset as isize) + net_jump
-  ));
-  offset
+  )?;
+  Ok(offset)
 }
 
 /// print a constant
@@ -160,10 +160,10 @@ fn constant_instruction(
   chunk: &Chunk,
   constant: u16,
   offset: usize,
-) -> usize {
-  stdout.write_fmt(format_args!("{:16} {:5} ", name, constant));
-  stdout.write_fmt(format_args!("{}\n", &chunk.constants[constant as usize]));
-  offset
+) -> io::Result<usize> {
+  write!(stdout, "{:16} {:5} ", name, constant)?;
+  writeln!(stdout, "{}", &chunk.constants[constant as usize])?;
+  Ok(offset)
 }
 
 /// print a closure
@@ -188,7 +188,7 @@ fn closure_instruction(
     writeln!(stderr,
       "!=== Compilation failure found {} instead of function ===!",
       value.value_type()
-    );
+    )?;
     panic!();
   };
 
@@ -201,21 +201,22 @@ fn closure_instruction(
     };
 
     match upvalue_index {
-      UpvalueIndex::Local(local) => { writeln!(s
-        tdout.write_fmt(format_args!(
+      UpvalueIndex::Local(local) => writeln!(
+        stdout,
         "{:0>4}      |                     local {}",
         current_offset, local
-      )); } ,
-      UpvalueIndex::Upvalue(upvalue) => { stdout.write_fmt(format_args!(
+      ),
+      UpvalueIndex::Upvalue(upvalue) => writeln!(
+        stdout,
         "{:0>4}      |                     upvalue {}",
         current_offset, upvalue
-      )); },
-    }
+      ),
+    }?;
 
     current_offset += 2;
   }
 
-  current_offset
+  Ok(current_offset)
 }
 
 fn invoke_instruction(

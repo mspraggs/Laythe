@@ -29,8 +29,8 @@ impl Stdio for NativeStdio {
     &mut self.stderr
   }
 
-  fn stdin(&self) -> &dyn std::io::Read {
-    &self.stdin
+  fn stdin(&mut self) -> &mut dyn std::io::Read {
+    &mut self.stdin
   }
 
   fn read_line(&self, buffer: &mut String) -> io::Result<usize> {

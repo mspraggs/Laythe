@@ -95,8 +95,7 @@ impl<'a, 's> Compiler<'a, 's> {
   /// use laythe_core::module::Module;
   /// use laythe_core::object::Class;
   /// use laythe_core::hooks::{GcHooks, NoContext};
-  /// use laythe_env::io::NativeIo;
-  /// use laythe_env::stdio::NativeStdIo;
+  /// use laythe_env::stdio::StdioWrapper;
   /// use laythe_env::memory::Gc;
   /// use std::path::PathBuf;
   ///
@@ -106,13 +105,13 @@ impl<'a, 's> Compiler<'a, 's> {
   /// let gc = Gc::default();
   /// let mut context = NoContext::new(&gc);
   /// let mut hooks = GcHooks::new(&mut context);
-  /// let mut parser = Parser::new(NativeStdIo(), &source);
+  /// let mut parser = Parser::new(StdioWrapper::default(), &source);
   /// let module = hooks.manage(Module::new(
   ///  hooks.manage(Class::bare(hooks.manage_str("module".to_string()))),
   ///  hooks.manage(PathBuf::from("./module.ly"))
   /// ));
   ///
-  /// let compiler = Compiler::new(module, NativeIo::default(), &mut parser, &mut hooks);
+  /// let compiler = Compiler::new(module, &mut parser, &mut hooks);
   /// ```
   pub fn new(
     module: Managed<Module>,
@@ -187,8 +186,7 @@ impl<'a, 's> Compiler<'a, 's> {
   /// use laythe_core::module::Module;
   /// use laythe_core::object::Class;
   /// use laythe_core::hooks::{GcHooks, NoContext};
-  /// use laythe_env::io::NativeIo;
-  /// use laythe_env::stdio::NativeStdIo;
+  /// use laythe_env::stdio::StdioWrapper;
   /// use laythe_env::memory::Gc;
   /// use std::path::PathBuf;
   ///
@@ -198,13 +196,13 @@ impl<'a, 's> Compiler<'a, 's> {
   /// let gc = Gc::default();
   /// let mut context = NoContext::new(&gc);
   /// let mut hooks = GcHooks::new(&mut context);
-  /// let mut parser = Parser::new(NativeStdIo(), &source);
+  /// let mut parser = Parser::new(StdioWrapper::default(), &source);
   /// let module = hooks.manage(Module::new(
   ///  hooks.manage(Class::bare(hooks.manage_str("module".to_string()))),
   ///  hooks.manage(PathBuf::from("./module.ly"))
   /// ));
   ///
-  /// let compiler = Compiler::new(module, NativeIo::default(), &mut parser, &mut hooks);
+  /// let compiler = Compiler::new(module, &mut parser, &mut hooks);
   /// let result = compiler.compile();
   /// assert_eq!(result.is_ok(), true);
   /// ```
@@ -2053,7 +2051,7 @@ mod test {
   fn assert_simple_bytecode(fun: Managed<Fun>, code: &[AlignedByteCode]) {
     let mut stdio = StdioWrapper::default();
 
-    disassemble_chunk(&mut stdio, &fun.chunk(), "test");
+    assert!(disassemble_chunk(&mut stdio, &fun.chunk(), "test").is_ok());
     let decoded_byte_code = decode_byte_code(fun);
     assert_eq!(decoded_byte_code.len(), code.len());
 
@@ -2066,7 +2064,7 @@ mod test {
   fn assert_fun_bytecode(fun: Managed<Fun>, code: &[ByteCodeTest]) {
     let mut stdio = StdioWrapper::default();
 
-    disassemble_chunk(&mut stdio, &fun.chunk(), &*fun.name);
+    assert!(disassemble_chunk(&mut stdio, &fun.chunk(), &*fun.name).is_ok());
     let decoded_byte_code = decode_byte_code(fun);
     assert_eq!(decoded_byte_code.len(), code.len(), "for fun {}", fun.name);
 

@@ -2,16 +2,16 @@ mod stdio;
 
 use laythe_core::{hooks::GcHooks, package::Package, LyResult};
 use laythe_env::managed::Managed;
-use stdio::add_stdio;
+use stdio::stdio_module;
 
 const IO_PACKAGE_NAME: &str = "io";
 
-pub fn add_io(hooks: &GcHooks, mut std: Managed<Package>) -> LyResult<()> {
-  let package = hooks.manage(Package::new(hooks.manage_str(IO_PACKAGE_NAME.to_string())));
+pub fn io_package(hooks: &GcHooks, std: Managed<Package>) -> LyResult<Managed<Package>> {
+  let mut package = hooks.manage(Package::new(hooks.manage_str(IO_PACKAGE_NAME.to_string())));
 
-  add_stdio(hooks, package)?;
+  let stdio = stdio_module(hooks, std)?;
 
-  std.add_package(hooks, package)?;
+  package.add_module(hooks, stdio)?;
 
-  Ok(())
+  Ok(package)
 }

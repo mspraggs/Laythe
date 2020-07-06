@@ -10,6 +10,12 @@ pub struct IoWrapper {
   io: Box<dyn Io>,
 }
 
+impl Default for IoWrapper {
+  fn default() -> Self {
+    Self::new(Box::new(MockIo()))
+  }
+}
+
 impl IoWrapper {
   pub fn new(io: Box<dyn Io>) -> Self {
     Self { io }

@@ -2,7 +2,7 @@ use laythe_core::{
   hooks::GcHooks,
   module::Module,
   native::{NativeFun, NativeMethod},
-  object::Class,
+  object::{Instance, Class},
   package::{Import, Package},
   value::Value,
   LyResult,
@@ -76,6 +76,29 @@ pub fn load_class_from_module(
   }
 }
 
+pub fn load_instance_from_module(
+  hooks: &GcHooks,
+  module: &Module,
+  name: &str,
+) -> LyResult<Managed<Instance>> {
+  let name = hooks.manage_str(name.to_string());
+  match module.import(hooks).get_field(&name) {
+    Some(symbol) => {
+      if symbol.is_instance() {
+        Ok(symbol.to_instance())
+      } else {
+        Err(hooks.make_error(format!("Symbol {} is not a instance.", name)))
+      }
+    }
+    None => Err(hooks.make_error(format!(
+      "Could not find symbol {} in module {}.",
+      name,
+      module.name()
+    ))),
+  }
+}
+
+
 pub fn export_and_insert(
   hooks: &GcHooks,
   module: &mut Module,
@@ -104,7 +127,7 @@ mod test {
   use laythe_env::{
     managed::{Managed, Trace},
     memory::{Gc, NoGc, NO_GC},
-    stdio::{StdioWrapper},
+    stdio::{StdioWrapper}, io::IoWrapper,
   };
   use std::path::PathBuf;
 
@@ -135,8 +158,8 @@ mod test {
       self
     }
 
-    fn io_context(&mut self) -> &mut dyn laythe_core::hooks::IoContext {
-      todo!()
+    fn io(&mut self) -> IoWrapper {
+      IoWrapper::default()
     }
   }
 

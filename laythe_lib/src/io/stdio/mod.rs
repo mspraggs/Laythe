@@ -4,11 +4,19 @@ mod stdout;
 use laythe_core::{hooks::GcHooks, module::Module, package::Package, LyResult};
 use laythe_env::managed::Managed;
 use std::path::PathBuf;
+use stdout::{define_stdout, declare_stdout};
+use stdin::{declare_stdin, define_stdin};
 
 const STDIO_PATH: &str = "std/io/stdio.ly";
 
-pub fn add_stdio(hooks: &GcHooks, io: Managed<Package>) -> LyResult<()> {
-  let module = Module::from_path(&hooks, hooks.manage(PathBuf::from(STDIO_PATH)))?;
+pub fn stdio_module(hooks: &GcHooks, std: Managed<Package>) -> LyResult<Managed<Module>> {
+  let mut module = hooks.manage(Module::from_path(&hooks, hooks.manage(PathBuf::from(STDIO_PATH)))?);
 
-  Ok(())
+  declare_stdout(hooks, &mut module, &*std)?;
+  declare_stdin(hooks, &mut module, &*std)?;
+
+  define_stdout(hooks, &mut module, &*std)?;
+  define_stdin(hooks, &mut module, &*std)?;
+
+  Ok(module)
 }

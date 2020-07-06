@@ -7,7 +7,7 @@ use laythe_core::{
   LyResult,
 };
 use laythe_env::{
-  io::{IoWrapper, Io},
+  io::{IoWrapper},
   managed::{Manage, Managed, Trace},
   stdio::{StdioWrapper},
 };

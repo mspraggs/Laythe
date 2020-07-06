@@ -43,9 +43,9 @@ impl<'a> Gc {
   /// # Examples
   /// ```
   /// use laythe_env::memory::Gc;
-  /// use laythe_env::stdio::NativeStdIo;
+  /// use laythe_env::stdio::StdioWrapper;
   ///
-  /// let gc = Gc::new(Box::new(NativeStdIo()));
+  /// let gc = Gc::new(StdioWrapper::default());
   /// ```
   pub fn new(stdio: StdioWrapper) -> Self {
     Gc {

@@ -26,7 +26,7 @@ impl StdioWrapper {
     self.stdio.stderr()
   }
 
-  pub fn stdin(&mut self) -> &dyn Read {
+  pub fn stdin(&mut self) -> &mut dyn Read {
     self.stdio.stdin()
   }
 
@@ -38,7 +38,7 @@ impl StdioWrapper {
 pub trait Stdio {
   fn stdout(&mut self) -> &mut dyn Write;
   fn stderr(&mut self) -> &mut dyn Write;
-  fn stdin(&self) -> &dyn Read;
+  fn stdin(&mut self) -> &mut dyn Read;
 
   fn read_line(&self, buffer: &mut String) -> io::Result<usize>;
 }
@@ -65,8 +65,8 @@ impl Stdio for MockStdio {
   fn stderr(&mut self) -> &mut dyn Write {
     &mut self.write
   }
-  fn stdin(&self) -> &dyn Read {
-    &self.read
+  fn stdin(&mut self) -> &mut dyn Read {
+    &mut self.read
   }
   fn read_line(&self, buffer: &mut String) -> io::Result<usize> {
     const LINE: &str = "let x = 10;";

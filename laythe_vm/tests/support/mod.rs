@@ -66,9 +66,12 @@ pub fn assert_file_exit_and_stdio(
   result: ExecuteResult,
 ) -> Result<()> {
   let mut mock_console = MockedConsoleIo::new(MockedStdIo::default());
-  let io = IoWrapper::new(mock_console.clone());
+  
 
-  assert_files_exit(&[path], file_path, io.clone(), result)?;
+  {
+    let io = IoWrapper::new(mock_console.clone());
+    assert_files_exit(&[path], file_path, io.clone(), result)?;
+  }
 
   mock_console.stdio.finish();
   if let Some(stdout) = stdout {
@@ -181,16 +184,22 @@ impl Default for MockedStdIo {
 
 impl MockedStdIo {
   pub fn finish(&mut self) {
-    if let Some(last) = self.stdout.borrow().last() {
-      if last == "" {
-        self.stdout.borrow_mut().pop();
-      }
+    let pop = self.stdout
+      .borrow().last()
+      .map(|last| last == "")
+      .unwrap_or(false);
+
+    if pop {
+      self.stdout.borrow_mut().pop();
     }
 
-    if let Some(last) = self.stderr.borrow().last() {
-      if last == "" {
-        self.stderr.borrow_mut().pop();
-      }
+    let pop = self.stderr
+      .borrow().last()
+      .map(|last| last == "")
+      .unwrap_or(false);
+
+    if pop {
+      self.stderr.borrow_mut().pop();
     }
   }
 }
@@ -202,7 +211,7 @@ impl Stdio for MockedStdIo {
   fn stderr(&mut self) -> &mut dyn Write {
     &mut self.stderr
   }
-  fn stdin(&self) -> &dyn Read {
+  fn stdin(&mut self) -> &mut dyn Read {
     todo!()
   }
   fn read_line(&self, _buffer: &mut String) -> Result<usize> {

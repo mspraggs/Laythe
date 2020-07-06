@@ -1,12 +1,11 @@
 use laythe_vm::vm::{default_native_vm, ExecuteResult};
 use support::{assert_file_exit_and_stdio, assert_files_exit};
 use laythe_env::io::IoWrapper;
-use laythe_native::io::NativeIo;
 
 mod support;
 
 fn test_file_exits(paths: &[&str], result: ExecuteResult) -> Result<(), std::io::Error> {
-  assert_files_exit(paths, FILE_PATH, IoWrapper::new(Box::new(NativeIo())), result)
+  assert_files_exit(paths, FILE_PATH, IoWrapper::default(), result)
 }
 
 fn test_file_with_stdio(
